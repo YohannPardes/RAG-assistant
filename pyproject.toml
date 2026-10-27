@@ -1,0 +1,35 @@
+[tool.uv.workspace]                              # turns this repo into one uv workspace (one .venv, one uv.lock)
+members = ["packages/*", "services/*"]           # every folder here with a pyproject.toml is a member
+
+[dependency-groups]                              # PEP 735 groups: not part of any package's install
+dev = [                                          # `dev` is synced by default
+    "pytest>=8",                                 # test runner
+    "ruff>=0.6",                                 # linter + formatter
+    "mypy>=1.11",                                # static type checker
+]
+
+[tool.ruff]                                      # settings shared by lint and format
+target-version = "py312"                         # allow/suggest Python 3.12 syntax
+line-length = 100                                # max characters per line
+src = ["packages/*/src", "services/*/src"]       # first-party code: keeps import sorting correct
+
+[tool.ruff.lint]                                 # which rule families are on
+select = ["E", "F", "I", "B", "UP"]              # pycodestyle, pyflakes, isort, bugbear, pyupgrade
+
+[tool.mypy]                                      # mypy settings
+python_version = "3.12"                          # check against 3.12 semantics
+strict = true                                    # all strict flags on (D-017)
+files = ["packages/*/src", "services/*/src"]     # what plain `mypy` checks: source only, not tests
+plugins = ["pydantic.mypy"]                      # teaches mypy how pydantic models build __init__
+
+[tool.pytest.ini_options]                        # pytest reads its config from this table
+testpaths = ["packages/*/tests", "services/*/tests", "tests"]   # folders searched when no path is given
+markers = [                                      # declared markers (unknown ones fail, see --strict-markers)
+    "integration: needs real external services (Qdrant, models, network)",   # opt-in tier
+    "eval: quality evaluation against the golden set; slow, non-deterministic", # opt-in tier
+]
+addopts = "--strict-markers --import-mode=importlib -m 'not integration and not eval'"  # default run = unit + contract (D-016); importlib allows same-named test files across services
+
+[tool.pydantic-mypy]                             # options for the pydantic mypy plugin
+init_typed = true                                # model __init__ uses field types, not Any
+init_forbid_extra = true                         # unknown keyword args to a model are type errors

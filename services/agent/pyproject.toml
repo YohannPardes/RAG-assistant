@@ -1,0 +1,16 @@
+[project]                                        # package metadata (PEP 621)
+name = "siteops-agent"                           # install name; import name is siteops_agent
+version = "0.1.0"                                # package version
+description = "Triage agent: reads logs, flags anomalies, calls rag and tickets over the network. Owns no data."  # one-line summary
+requires-python = ">=3.12"                       # minimum Python version
+dependencies = [                                 # runtime dependencies, installed in this service's image
+    "pydantic>=2",                               # data models and validation
+    "siteops-common",                            # shared wire contracts (D-020)
+]
+
+[tool.uv.sources]                                # where uv gets dependencies from, instead of PyPI
+siteops-common = { workspace = true }            # use the workspace member in packages/common
+
+[build-system]                                   # how to build this package into a wheel
+requires = ["hatchling"]                         # build tool fetched at build time
+build-backend = "hatchling.build"                # entry point uv/pip call to build
