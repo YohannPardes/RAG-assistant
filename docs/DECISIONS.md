@@ -6,32 +6,32 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 
 **Priority (Open entries only):** **P1** — decide before writing code · **P2** — decide while building that part · **P3** — cut candidate for the 8-day scope; confirming the cut is itself the decision.
 
-IDs are permanent and never renumbered (entries cross-reference them). New decisions take the next free ID and go under the matching category.
+**IDs** are `subject/number`, numbered within each subject: `scope` · `arch` · `design` · `rag` · `agent` · `tooling` (e.g. `arch/4`). Cite decisions this way everywhere (docs, code comments, commits). A new decision takes the next free number in its subject and goes at the end of that section. Don't renumber existing IDs: other entries and the code cite them.
 
 ## Index
 
-| Category                                                                                                 | Decisions                                                                   |
-| -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| [1. Scope &amp; evaluation](#1-scope--evaluation)                                                         | D-001, D-002, D-005, D-034, D-035, D-040                                    |
-| [2. Architecture &amp; service boundaries](#2-architecture--service-boundaries)                           | D-004, D-010, D-019, D-020, D-021, D-022, D-036, D-037, D-041, D-043        |
-| [3. Code design &amp; dependency injection](#3-code-design--dependency-injection)                         | D-003, D-007, D-008, D-018                                                  |
-| [4. RAG pipeline: ingestion, retrieval &amp; generation](#4-rag-pipeline-ingestion-retrieval--generation) | D-006, D-011, D-012, D-023, D-024, D-026, D-027, D-028, D-029, D-030, D-039 |
-| [5. Agent, access &amp; safety](#5-agent-access--safety)                                                  | D-013, D-025, D-031, D-032, D-033, D-042                                    |
-| [6. Tooling, packaging &amp; testing](#6-tooling-packaging--testing)                                      | D-009, D-014, D-015, D-016, D-017, D-038                                    |
+| Subject     | Category                                                                                                 | Decisions              |
+| ----------- | -------------------------------------------------------------------------------------------------------- | ---------------------- |
+| `scope`   | [1. Scope &amp; evaluation](#1-scope--evaluation)                                                         | scope/1 – scope/6     |
+| `arch`    | [2. Architecture &amp; service boundaries](#2-architecture--service-boundaries)                           | arch/1 – arch/11      |
+| `design`  | [3. Code design &amp; dependency injection](#3-code-design--dependency-injection)                         | design/1 – design/4   |
+| `rag`     | [4. RAG pipeline: ingestion, retrieval &amp; generation](#4-rag-pipeline-ingestion-retrieval--generation) | rag/1 – rag/11        |
+| `agent`   | [5. Agent, access &amp; safety](#5-agent-access--safety)                                                  | agent/1 – agent/8     |
+| `tooling` | [6. Tooling, packaging &amp; testing](#6-tooling-packaging--testing)                                      | tooling/1 – tooling/6 |
 
 ## Open decisions by priority
 
-| Priority                       | Decisions                                                                                                                                                                                                                                                                             |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **P1 — before code**    | D-021 own modules as services · D-022 MCP transport · D-023 LLM + serving · D-024 embedding model · D-025 access levels                                                                                                                                                           |
-| **P2 — while building** | D-026 chunking · D-027 retrieval depth · D-028 reranker model · D-029 "I don't know" rule · D-030 citations · D-031 ticket fingerprint · D-032 agent loop · D-033 auth · D-034 golden set · D-035 eval thresholds · D-036 timeouts/retries · D-037 persistence · D-038 CI |
-| **P3 — cut candidates** | D-039 hybrid search · D-040 LLM-judge metric · D-041 distributed tracing · D-042 scheduled triage · D-043 backups                                                                                                                                                                 |
+| Priority                       | Decisions                                                                                                                                                                                                                                                                                              |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **P1 — before code**    | rag/4 LLM + serving · rag/5 embedding model · agent/2 access levels                                                                                                                                                                        |
+| **P2 — while building** | rag/6 chunking · rag/7 retrieval depth · rag/8 reranker model · rag/9 "I don't know" rule · rag/10 citations · agent/3 ticket fingerprint · agent/4 agent loop · agent/5 auth · scope/4 golden set · scope/5 eval thresholds · arch/7 timeouts/retries · arch/8 persistence · tooling/6 CI |
+| **P3 — cut candidates** | rag/11 hybrid search · scope/6 LLM-judge metric · arch/9 distributed tracing · agent/6 scheduled triage · arch/10 backups                                                                                                                                                                          |
 
 ---
 
 # 1. Scope & evaluation
 
-### D-001 — Project scope: one repo, two entry points, shared core
+### scope/1 — Project scope: one repo, two entry points, shared core
 
 **Status:** Decided (2026-10-27)
 
@@ -39,60 +39,60 @@ IDs are permanent and never renumbered (entries cross-reference them). New decis
 - **Triage (agent):** reads new logs, flags anomalies, retrieves runbook section, writes incident report, opens ticket via MCP.
 - **Why:** covers RAG + agents + tools + MCP + Docker without becoming a big system; every component is defensible line by line.
 
-### D-002 — Synthetic logs with seeded faults as ground truth
+### scope/2 — Synthetic logs with seeded faults as ground truth
 
 **Status:** Decided (2026-10-27)
 
 - Faults (overheating, link drop, PSU error) + normal noise; each fault maps to a runbook entry.
 - **Why:** makes the agent *measurable* — ticket precision/recall, correct citation, no duplicates.
 
-### D-005 — Keep `reranker` and `api` in scope
+### scope/3 — Keep `reranker` and `api` in scope
 
 **Status:** Decided (2026-10-27)
 
 - **Note:** reranker's value must be shown by an eval number (recall@k / MRR with vs without).
 
-### D-034 — Golden set: size and construction
+### scope/4 — Golden set: size and construction
 
 **Status:** Open · **Priority:** P2
 
-- How many question → expected-chunk pairs, how they're written (by hand from runbooks, or generated then reviewed), and how triage ground truth links to D-002's seeded faults.
+- How many question → expected-chunk pairs, how they're written (by hand from runbooks, or generated then reviewed), and how triage ground truth links to scope/2's seeded faults.
 
-### D-035 — Eval pass thresholds
+### scope/5 — Eval pass thresholds
 
 **Status:** Open · **Priority:** P2
 
-- Target numbers for recall@5, MRR (with vs without reranker, D-005), and ticket precision/recall.
+- Target numbers for recall@5, MRR (with vs without reranker, scope/3), and ticket precision/recall.
 
-### D-040 — LLM-as-judge for answer quality
+### scope/6 — LLM-as-judge for answer quality
 
 **Status:** Open · **Priority:** P3 (cut candidate)
 
-- Score generated answers with an LLM judge, or rely only on retrieval metrics + citation checks (D-030).
+- Score generated answers with an LLM judge, or rely only on retrieval metrics + citation checks (rag/10).
 
 ---
 
 # 2. Architecture & service boundaries
 
-### D-004 — Microservices architecture
+### arch/1 — Microservices architecture
 
 **Status:** Decided (2026-10-27)
 
 - Services talk over the network. Baseline set: `api`, `tickets` (MCP), `qdrant`, `llm`.
-- **Open:** which of my own modules (e.g. reranker) become separate services → see D-021.
+- **Open:** which of my own modules (e.g. reranker) become separate services → see arch/5.
 - **Cost:** serialization, timeouts, retries, extra failure modes to test.
 
-### D-010 — Service boundary = adapter
+### arch/2 — Service boundary = adapter
 
 **Status:** Proposed
 
 - A module promoted to a service gets an HTTP adapter implementing the *same* interface (`HttpReranker` vs `CrossEncoderReranker`). Deployment becomes config, not code change.
 
-### D-019 — Ticket service owns its contract
+### arch/3 — Ticket service owns its contract
 
-**Status:** Superseded by D-020
+**Status:** Superseded by arch/4
 
-### D-020 — Shared `common` package for cross-service contracts
+### arch/4 — Shared `common` package for cross-service contracts
 
 **Status:** Decided (2026-10-27)
 
@@ -103,55 +103,64 @@ IDs are permanent and never renumbered (entries cross-reference them). New decis
 - Docker: each image copies `common` + its own service, `uv sync --package <service>`; build context = repo root.
 - MCP tool schemas are generated from `common` pydantic models (single source of truth for the wire format).
 
-### D-036 — Timeout and retry policy for network calls
-
-### D-021 — Which of my own modules become separate services
+### arch/5 — Which of my own modules become separate services
 
 **Status:** Decided (2026-10-27)
 
 - **Rule:** a component becomes a service only when something requires it: a different resource profile (GPU / large model), independent scaling, multiple consumers, or data locality. Otherwise it stays a module inside a service.
 - **Embedding:** off-the-shelf inference server (e.g. text-embeddings-inference, or the Ollama/vLLM embeddings endpoint) behind an HTTP `Embedder` adapter. No service code of my own.
-- **Reranker:** module of the RAG pipeline, in-process behind its interface. Can move to an inference server (TEI `/rerank`) via D-010 if evals justify it.
+- **Reranker:** module of the RAG pipeline, in-process behind its interface. Can move to an inference server (TEI `/rerank`) via arch/2 if evals justify it.
 - **Ingestion:** a **job**, not a service: a one-off container (`docker compose run ingest`) that parses PDFs, writes to the vector store, and exits.
-- **Cost:** inference servers are extra containers to run and health-check; their network calls inherit D-004's costs.
+- **Cost:** inference servers are extra containers to run and health-check; their network calls inherit arch/1's costs.
 
-### D-022 — MCP transport for the tickets server
+### arch/6 — MCP transport for the tickets server
 
 **Status:** Decided (2026-10-27)
 
 - **Streamable HTTP.** Tickets runs in its own container and serves any number of MCP clients at once.
-- **Why not stdio:** stdio runs the server as a subprocess of the agent, so the tickets code and its dependencies would live inside the agent image (breaks D-020) and its lifecycle would be tied to the agent's.
+- **Why not stdio:** stdio runs the server as a subprocess of the agent, so the tickets code and its dependencies would live inside the agent image (breaks arch/4) and its lifecycle would be tied to the agent's.
 - **Non-AI clients:** if needed later, add a REST endpoint next to MCP, backed by the same store.
 - **Cost:** it is a network endpoint, so it needs auth (API key) and timeouts/retries.
 - **Tests:** unit tests call the tool functions directly or use an in-memory MCP client; one integration test over real HTTP.
 
+### arch/7 — Timeout and retry policy for network calls
+
 **Status:** Open · **Priority:** P2
 
-- Per-call timeouts, which calls retry (idempotent only?), backoff. Answers D-004's cost line.
+- Per-call timeouts, which calls retry (idempotent only?), backoff. Answers arch/1's cost line.
 
-### D-037 — Persistence: Docker volumes for Qdrant and SQLite
+### arch/8 — Persistence: Docker volumes for Qdrant and SQLite
 
 **Status:** Open · **Priority:** P2
 
 - Named volumes vs bind mounts; what survives `docker compose down`.
 
-### D-041 — Distributed tracing (OpenTelemetry)
+### arch/9 — Distributed tracing (OpenTelemetry)
 
 **Status:** Open · **Priority:** P3 (cut candidate)
 
 - Tracing across services vs structured logs with a propagated request ID only.
 
-### D-043 — Backups for Qdrant / SQLite volumes
+### arch/10 — Backups for Qdrant / SQLite volumes
 
 **Status:** Open · **Priority:** P3 (cut candidate)
 
 - Data is reproducible from `scripts/ingest.py` and `scripts/generate_logs.py`.
 
+
+### arch/11 — No API gateway in this version
+
+**Status:** Deferred (2026-10-27)
+
+- Auth, rate limits, TLS, routing belong at the edge (API gateway), not duplicated per service.
+- Not built: one public entry point (agent `/chat`); scope stays on the AI components.
+- Next step: edge gateway (Envoy / Kong / Traefik) + LLM gateway (e.g. LiteLLM proxy) for per-user token budgets, model routing, fallback.
+
 ---
 
 # 3. Code design & dependency injection
 
-### D-003 — Every external technology sits behind an interface
+### design/1 — Every external technology sits behind an interface
 
 **Status:** Decided (2026-10-27)
 
@@ -160,188 +169,197 @@ IDs are permanent and never renumbered (entries cross-reference them). New decis
 - **Why:** no component depends on a single technology; tests run on fakes/in-memory adapters.
 - **Cost:** more files; each interface must have ≥2 implementations (one real, one fake) to justify existing. This rule is what stops speculative interfaces; it also keeps implementation details from leaking into the interface and makes testing easy.
 
-### D-007 — Interfaces via `abc.ABC` (not `typing.Protocol`)
+### design/2 — Interfaces via `abc.ABC` (not `typing.Protocol`)
 
 **Status:** Decided (2026-10-27)
 
 - **Why:** explicit dependency — each adapter declares the interface it implements, and a missing method fails at instantiation instead of at first call.
 - **Cost:** every adapter imports and subclasses the interface, so adapters depend on core. Changing an interface means changing every adapter.
 
-### D-008 — Single composition root
+### design/3 — Single composition root
 
 **Status:** Proposed
 
 - Only one place (`container.py` / factory) reads env and instantiates concrete adapters; everything else receives dependencies via `__init__`.
 
-### D-018 — Configuration via environment (`pydantic-settings`) + `.env.example`
+### design/4 — Configuration via environment (`pydantic-settings`) + `.env.example`
 
 **Status:** Proposed
 
-- Only the composition root (D-008) reads settings.
+- Only the composition root (design/3) reads settings.
 
 ---
 
 # 4. RAG pipeline: ingestion, retrieval & generation
 
-### D-006 — Vector store: Qdrant (not Pinecone)
+### rag/1 — Vector store: Qdrant (not Pinecone)
 
 **Status:** Proposed
 
 - **Why:** on-prem, matches target stack, `:memory:` mode for tests. Pinecone is SaaS-only.
 
-### D-011 — Chunker consumes own `Element` IR, not Docling objects
+### rag/2 — Chunker consumes own `Element` IR, not Docling objects
 
 **Status:** Proposed
 
 - `Element(kind=heading|paragraph|table, text, page)`; `DocumentParser` adapters produce it.
 - **Why:** chunker is pure and unit-testable without PDFs or Docling installed.
 
-### D-012 — Deterministic `chunk_id`
+### rag/3 — Deterministic `chunk_id`
 
 **Status:** Proposed
 
 - Derived from content + source (hash), so re-ingestion upserts instead of duplicating.
 
-### D-023 — LLM: model and serving runtime
+### rag/4 — LLM: model and serving runtime
 
 **Status:** Open · **Priority:** P1
 
 - Which model, served by vLLM, Ollama or a proxy. Fixes the `llm` container in `docker-compose.yml` and what `llm.py`'s OpenAI-compatible client points at.
 
-### D-024 — Embedding model
+### rag/5 — Embedding model
 
 **Status:** Open · **Priority:** P1
 
-- Which model, and its vector size (fixes the Qdrant collection). Whether it runs in-process or as a service is D-021.
+- Which model, and its vector size (fixes the Qdrant collection). Whether it runs in-process or as a service is arch/5.
 
-### D-026 — Chunking strategy
+### rag/6 — Chunking strategy
 
 **Status:** Open · **Priority:** P2
 
 - Split by heading/section vs fixed size; size and overlap; tables kept whole or split.
 
-### D-027 — Retrieval depth
+### rag/7 — Retrieval depth
 
 **Status:** Open · **Priority:** P2
 
 - k fetched from Qdrant before reranking, k kept after.
 
-### D-028 — Reranker model
+### rag/8 — Reranker model
 
 **Status:** Open · **Priority:** P2
 
-- Which cross-encoder (or alternative). Value proven per D-005.
+- Which cross-encoder (or alternative). Value proven per scope/3.
 
-### D-029 — "I don't know" rule
+### rag/9 — "I don't know" rule
 
 **Status:** Open · **Priority:** P2
 
 - Score threshold on retrieved chunks, LLM judgment, or both.
 
-### D-030 — Citation format and check
+### rag/10 — Citation format and check
 
 **Status:** Open · **Priority:** P2
 
 - Cite by page, section or chunk ID; how a citation is verified to exist in the retrieved context.
 
-### D-039 — Hybrid search (BM25 + vectors)
+### rag/11 — Hybrid search (BM25 + vectors)
 
 **Status:** Open · **Priority:** P3 (cut candidate)
 
-- Error codes are exact tokens, which is where keyword search helps; only worth it if D-035's recall numbers show a gap.
+- Error codes are exact tokens, which is where keyword search helps; only worth it if scope/5's recall numbers show a gap.
 
 ---
 
 # 5. Agent, access & safety
 
-### D-013 — Agent design: single agent + deterministic pre-filter; logs are untrusted
+### agent/1 — Agent design: single agent + deterministic pre-filter; logs are untrusted
 
 **Status:** Proposed
 
 - Regex/threshold pre-filter flags windows; LLM reasons only on flagged windows.
 - Agent's only side effect is `create_ticket`, deduplicated by fault fingerprint (prompt-injection blast radius).
 
-### D-025 — Access-level model
+### agent/2 — Access-level model
 
 **Status:** Open · **Priority:** P1
 
 - Which levels exist, where a caller's level comes from, and how it's stored in the Qdrant payload (the filter lives in `qdrant_store.py`). Affects the chunk schema, so it's needed before ingestion.
 
-### D-031 — Ticket fingerprint and dedup window
+### agent/3 — Ticket fingerprint and dedup window
 
 **Status:** Open · **Priority:** P2
 
-- Which fields define "the same fault" (D-013), and for how long a duplicate is suppressed.
+- Which fields define "the same fault" (agent/1), and for how long a duplicate is suppressed.
 
-### D-032 — Agent loop: implementation and limits
+### agent/4 — Agent loop: implementation and limits
 
 **Status:** Open · **Priority:** P2
 
 - Hand-written loop vs framework; max steps, tool-call budget, timeout.
 
-### D-033 — Auth for the API and the MCP server
+### agent/5 — Auth for the API and the MCP server
 
 **Status:** Open · **Priority:** P2
 
 - API key only? How keys are issued, stored and checked (the tickets store already plans an API-key check).
 
-### D-042 — Scheduled / watcher-triggered triage
+### agent/6 — Scheduled / watcher-triggered triage
 
 **Status:** Open · **Priority:** P3 (cut candidate)
 
 - On-demand `/triage` only vs a scheduler or log watcher.
 
-
-### D-044 — RAG and agent are separate services
+### agent/7 — RAG and agent are separate services
 
 **Status:** Decided (2026-10-27)
 
-- Services I write: `rag`, `agent`, `tickets`. Layout adds `services/agent/` (D-020).
+- Services I write: `rag`, `agent`, `tickets`. Layout adds `services/agent/` (arch/4).
 - **rag:** owns retrieval and generation and sits next to the vector store. Exposes `/search` (ranked chunks with metadata) and `/ask` (answer with citations). Serves two consumers: engineers (Ask) and the agent (Triage).
 - **agent:** a pure orchestrator. Every tool is a network call: `search_runbooks` → rag `/search`, `create_ticket` → tickets via MCP, `read_logs` → log source. No model or vector-store dependencies, so the image is small.
 - **Why:** RAG has multiple consumers and belongs next to its data. The agent has a different runtime (scheduled loop vs request/response). **Security isolation:** the agent processes untrusted logs, so a prompt-injected agent can only query rag and create (deduplicated) tickets. It cannot reach Qdrant, ingestion, or anything else.
-- **Contracts:** `/search` and `/ask` request/response models live in `common` (D-020).
+- **Contracts:** `/search` and `/ask` request/response models live in `common` (arch/4).
 - **Cost:** a third service to build, deploy and test; agent → rag adds a network hop with its own timeouts and failure handling.
+
+### agent/8 — The agent is the user's front door
+
+**Status:** Decided (2026-10-27)
+
+- Users (UI, SDK) talk to the **agent** (`/chat`). The agent decides which tools to call: search runbooks (rag), open a ticket (tickets MCP).
+- The agent has two modes on the same tools: **chat** (user request) and **triage** (trigger: schedule / CLI).
+- **rag `/ask` is kept** as a direct Q&A endpoint and as the **evaluation baseline**: answer quality is measured without the agent loop's noise.
+- **Why:** matches the "autonomous agents" focus; one entry point; tools are reused across both modes.
+- **Cost:** every user question goes through an LLM loop (latency, cost, less determinism). The agent now receives **two untrusted inputs**, user text and logs, while holding the ticket permission, so tool permissions and ticket dedup matter more.
 
 ---
 
 # 6. Tooling, packaging & testing
 
-### D-014 — Tooling: `uv` + `hatchling`, Python 3.12
+### tooling/1 — Tooling: `uv` + `hatchling`, Python 3.12
 
 **Status:** Decided (2026-10-27)
 
-- `uv` for env + lockfile (reproducible Docker builds); `hatchling` build backend; every workspace member uses a src layout (`<member>/src/<package>/`, see D-020).
+- `uv` for env + lockfile (reproducible Docker builds); `hatchling` build backend; every workspace member uses a src layout (`<member>/src/<package>/`, see arch/4).
 
-### D-015 — Dependencies split into extras that mirror the adapters
+### tooling/2 — Dependencies split into extras that mirror the adapters
 
 **Status:** Decided (2026-10-27)
 
 - Core = only what the domain needs (pydantic). Each technology is an extra (`qdrant`, `docling`, …).
 - Dev tools (pytest, ruff, mypy) go in `[dependency-groups] dev` (PEP 735), not an extra — not shipped with the package.
 - Consequence: adapters are imported lazily by the composition root, so `import site_ops` works without any extra.
-- **Why:** core installs with zero vendor tech (enforces D-003); each service image installs only its extras (D-004).
+- **Why:** core installs with zero vendor tech (enforces design/1); each service image installs only its extras (arch/1).
 
-### D-016 — Test tiers via pytest markers
+### tooling/3 — Test tiers via pytest markers
 
 **Status:** Decided (2026-10-27)
 
 - Default `pytest` runs unit + contract (fast, no network). `integration` and `eval` are opt-in markers; `--strict-markers` on.
 
-### D-017 — Lint + type check: `ruff` + `mypy` strict
+### tooling/4 — Lint + type check: `ruff` + `mypy` strict
 
 **Status:** Decided (2026-10-27)
 
-- **Why mypy on top of ABCs (D-007):** an ABC only checks that methods exist, and only at instantiation. mypy checks signatures and types at every call site, including the pydantic models that cross service boundaries (D-020).
+- **Why mypy on top of ABCs (design/2):** an ABC only checks that methods exist, and only at instantiation. mypy checks signatures and types at every call site, including the pydantic models that cross service boundaries (arch/4).
 - mypy `strict` on `packages/*/src` and `services/*/src` from day one; relaxed for `tests/`.
 
-### D-009 — Contract tests per interface
+### tooling/5 — Contract tests per interface
 
 **Status:** Proposed
 
 - One test suite per interface, parametrized over all implementations (e.g. InMemory + Qdrant `:memory:`).
 
-### D-038 — CI pipeline
+### tooling/6 — CI pipeline
 
 **Status:** Open · **Priority:** P2
 
