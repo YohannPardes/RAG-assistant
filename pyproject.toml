@@ -18,7 +18,7 @@ select = ["E", "F", "I", "B", "UP"]              # pycodestyle, pyflakes, isort,
 
 [tool.mypy]                                      # mypy settings
 python_version = "3.12"                          # check against 3.12 semantics
-strict = true                                    # all strict flags on (D-017)
+strict = true                                    # all strict flags on
 files = ["packages/*/src", "services/*/src"]     # what plain `mypy` checks: source only, not tests
 plugins = ["pydantic.mypy"]                      # teaches mypy how pydantic models build __init__
 
@@ -28,7 +28,7 @@ markers = [                                      # declared markers (unknown one
     "integration: needs real external services (Qdrant, models, network)",   # opt-in tier
     "eval: quality evaluation against the golden set; slow, non-deterministic", # opt-in tier
 ]
-addopts = "--strict-markers --import-mode=importlib -m 'not integration and not eval'"  # default run = unit + contract (D-016); importlib allows same-named test files across services
+addopts = "--strict-markers --import-mode=importlib -m 'not integration and not eval'"  # default run = unit + contract; importlib allows same-named test files across services
 
 [tool.pydantic-mypy]                             # options for the pydantic mypy plugin
 init_typed = true                                # model __init__ uses field types, not Any

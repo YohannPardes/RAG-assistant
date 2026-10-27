@@ -4,7 +4,7 @@ version = "0.1.0"                                # package version
 description = "Shared wire contracts (pydantic models) exchanged between services. No logic."  # one-line summary
 requires-python = ">=3.12"                       # minimum Python version
 dependencies = [                                 # installed wherever this package is installed
-    "pydantic>=2",                               # the only dependency allowed here (D-020)
+    "pydantic>=2",                               # the only dependency allowed here (arch/4)
 ]
 
 [build-system]                                   # how to build this package into a wheel
