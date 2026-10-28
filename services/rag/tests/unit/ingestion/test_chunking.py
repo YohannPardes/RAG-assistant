@@ -215,6 +215,17 @@ def test_row_too_big_for_table_form_keeps_labels() -> None:
     assert len(command_pieces) > 1
     assert "".join(command_pieces) == command
 
+def test_every_chunk_of_a_split_row_starts_with_the_row_key() -> None:
+    header = ("Step", "Command", "Who")
+    command = ("patronictl reinit orders-db db-primary-01 then wait until "
+               "the member state shows streaming again and confirm lag is zero")
+    rows = (header, ("Rebuild", command, "DBA on-call"))
+
+    chunks = _chunk(_doc(Element("table", render_table(rows), rows=rows)), max_chars=60)
+
+    assert len(chunks) > 1
+    assert all(c.text.startswith("Step : Rebuild\n") for c in chunks)  # no chunk holds the key alone
+
 def test_pipe_in_a_cell_is_escaped() -> None:
     rows = (("Command",), ("du -sh * | sort -h",))
 
