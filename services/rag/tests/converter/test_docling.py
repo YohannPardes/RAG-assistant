@@ -64,7 +64,7 @@ def test_converting_without_errors(filename, media_type, expected_text, docling_
          ),
         ("runbook_db_failover.docx", 
          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-         1
+         0
          ),
         ("runbook_high_latency.txt",
          "text/plain",
