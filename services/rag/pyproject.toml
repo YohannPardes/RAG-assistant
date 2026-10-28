@@ -8,6 +8,11 @@ dependencies = [                                 # runtime dependencies, install
     "siteops-common",                            # shared wire contracts
 ]
 
+[project.optional-dependencies]
+docling = [
+    "docling>=2.143.0",
+]
+
 [tool.uv.sources]                                # where uv gets dependencies from, instead of PyPI
 siteops-common = { workspace = true }            # use the workspace member in packages/common
 
