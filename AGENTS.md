@@ -19,7 +19,8 @@ Every service has its own `Dockerfile`, built with the repo root as build contex
 
 ```
 rag_project/
-├── pyproject.toml   uv.lock   Makefile   docker-compose.yml   README.md   AGENTS.md   CLAUDE.md (imports AGENTS.md)
+├── pyproject.toml   uv.lock   .python-version   Makefile   docker-compose.yml   README.md   AGENTS.md   CLAUDE.md (imports AGENTS.md)
+├── .github/workflows/ci.yml    CI on push / PR
 ├── docs/DECISIONS.md
 │
 ├── packages/common/
@@ -39,12 +40,19 @@ rag_project/
 │   │   ├── ingestion/
 │   │   │   ├── chunking.py     CORE    Elements → Chunks
 │   │   │   └── pipeline.py     CORE    parse → chunk → embed → store  (run as a job)
-│   │   ├── parser/       base.py  docling.py  text.py      INTERFACE + ADAPTERS
+│   │   ├── converter/    base.py  docling.py  text.py      INTERFACE + ADAPTERS  document bytes → markdown
 │   │   ├── embedder/     base.py  http.py     fake.py
 │   │   ├── vector_store/ base.py  qdrant.py   memory.py
 │   │   ├── reranker/     base.py  cross_encoder.py  passthrough.py
 │   │   └── llm/          base.py  openai_compat.py  fake.py
-│   └── tests/                  unit + contract tests for rag only
+│   └── tests/                  unit + contract tests for rag only; subfolders mirror src/
+│       ├── conftest.py             FIXTURES path
+│       ├── converter/test_docling.py
+│       ├── ingestion/test_ingestion.py
+│       └── fixtures/               sample runbooks, one per supported format
+│           ├── runbook_disk_full.pdf      runbook_db_failover.docx
+│           ├── runbook_cert_expiry.md     runbook_high_latency.txt
+│           └── images/                    diagrams (cert_renewal.png is referenced by the .md)
 │
 ├── services/agent/
 │   ├── pyproject.toml   Dockerfile
