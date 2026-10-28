@@ -1,14 +1,7 @@
-from pathlib import Path
-
 import pytest
 
-from ..conftest import FIXTURES
+pytestmark = pytest.mark.integration
 
-
-@pytest.fixture(scope = "module")
-def docling_converter():
-    from siteops_rag.converter.docling import DoclingMarkdownConverter
-    return DoclingMarkdownConverter()
 
 def test_converting_empty_doc(docling_converter) -> None:
 
@@ -41,9 +34,10 @@ def test_converting_empty_doc(docling_converter) -> None:
          ),
     ],
 )
-def test_converting_without_errors(filename, media_type, expected_text, docling_converter) -> None:
+def test_converting_without_errors(filename, media_type, expected_text, 
+                                   docling_converter, fixtures_dir) -> None:
 
-    data = Path(f"{FIXTURES}/{filename}").read_bytes()
+    data = (fixtures_dir / filename).read_bytes()
 
     out = docling_converter.convert_to_markdown(data, media_type=media_type)
 
@@ -73,9 +67,9 @@ def test_converting_without_errors(filename, media_type, expected_text, docling_
     ],
 )
 def test_page_breaks_in_converted_markdown(filename, media_type, 
-                                        expected_page_break_count, docling_converter) -> None:
+                                expected_page_break_count, docling_converter, fixtures_dir) -> None:
 
-    data = Path(f"{FIXTURES}/{filename}").read_bytes()
+    data = (fixtures_dir / filename).read_bytes()
 
     out = docling_converter.convert_to_markdown(data, media_type=media_type)
 
@@ -117,9 +111,9 @@ def _table_rows(markdown: str) -> list[list[str]]:
     ],
 )
 def test_tables_are_parsed(filename, media_type, expected_header,
-                           expected_row, docling_converter) -> None:
+                           expected_row, docling_converter, fixtures_dir) -> None:
 
-    data = Path(f"{FIXTURES}/{filename}").read_bytes()
+    data = (fixtures_dir / filename).read_bytes()
 
     out = docling_converter.convert_to_markdown(data, media_type=media_type)
 
@@ -150,10 +144,10 @@ def test_tables_are_parsed(filename, media_type, expected_header,
     ],
 )
 def test_images_yield_image_placeholder(filename, media_type,
-                                        expected_image_count, docling_converter) -> None:
+                                    expected_image_count, docling_converter, fixtures_dir) -> None:
     from siteops_rag.converter.docling import IMAGE_PLACEHOLDER
 
-    data = Path(f"{FIXTURES}/{filename}").read_bytes()
+    data = (fixtures_dir / filename).read_bytes()
 
     out = docling_converter.convert_to_markdown(data, media_type=media_type)
 
@@ -177,9 +171,9 @@ def test_images_yield_image_placeholder(filename, media_type,
     ],
 )
 def test_commands_are_not_html_escaped(filename, media_type,
-                                       expected_command, docling_converter) -> None:
+                                       expected_command, docling_converter, fixtures_dir) -> None:
 
-    data = Path(f"{FIXTURES}/{filename}").read_bytes()
+    data = (fixtures_dir / filename).read_bytes()
 
     out = docling_converter.convert_to_markdown(data, media_type=media_type)
 

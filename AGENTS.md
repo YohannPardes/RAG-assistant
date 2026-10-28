@@ -45,10 +45,14 @@ rag_project/
 │   │   ├── vector_store/ base.py  qdrant.py   memory.py
 │   │   ├── reranker/     base.py  cross_encoder.py  passthrough.py
 │   │   └── llm/          base.py  openai_compat.py  fake.py
-│   └── tests/                  unit + contract tests for rag only; subfolders mirror src/
-│       ├── conftest.py             FIXTURES path
-│       ├── converter/test_docling.py
-│       ├── ingestion/test_ingestion.py
+│   └── tests/                  rag only; under unit/ and integration/, subfolders mirror src/
+│       ├── conftest.py             fixtures_dir fixture (shared)
+│       ├── unit/                   fast tier, no optional extras
+│       │   └── converter/test_text.py
+│       ├── integration/            marked `integration`; run with `pytest -m integration`
+│       │   ├── conftest.py         docling_converter fixture (session, importorskip)
+│       │   └── converter/test_docling.py
+│       ├── ingestion/test_ingestion.py   (uncommitted chunker work; not yet under unit/)
 │       └── fixtures/               sample runbooks, one per supported format
 │           ├── runbook_disk_full.pdf      runbook_db_failover.docx
 │           ├── runbook_cert_expiry.md     runbook_high_latency.txt
