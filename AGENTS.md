@@ -50,7 +50,7 @@ rag_project/
 │       ├── unit/                   fast tier, no optional extras
 │       │   └── converter/test_text.py
 │       ├── integration/            marked `integration`; run with `pytest -m integration`
-│       │   ├── conftest.py         docling_converter fixture (session, importorskip)
+│       │   ├── conftest.py         docling_converter fixture (session; Docling required, imported lazily)
 │       │   └── converter/test_docling.py
 │       ├── ingestion/test_ingestion.py   (uncommitted chunker work; not yet under unit/)
 │       └── fixtures/               sample runbooks, one per supported format
