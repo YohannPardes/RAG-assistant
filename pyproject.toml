@@ -10,7 +10,7 @@ dev = [                                          # `dev` is synced by default
 
 [tool.ruff]                                      # settings shared by lint and format
 target-version = "py312"                         # allow/suggest Python 3.12 syntax
-line-length = 100                                # max characters per line
+line-length = 150                                # max characters per line
 src = ["packages/*/src", "services/*/src"]       # first-party code: keeps import sorting correct
 
 [tool.ruff.lint]                                 # which rule families are on
