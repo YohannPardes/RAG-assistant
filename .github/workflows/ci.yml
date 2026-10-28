@@ -63,3 +63,25 @@ jobs:
         run: uv sync --locked
       - name: Pytest (fast tier)
         run: uv run pytest
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-python: true
+      - name: Cache Hugging Face models
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-${{ runner.os }}-${{ hashFiles('uv.lock') }}
+      - name: Install Python
+        run: uv python install
+      - name: Install workspace with all extras
+        run: uv sync --locked --all-extras
+      - name: Pytest (integration tier)
+        run: uv run pytest -m integration
