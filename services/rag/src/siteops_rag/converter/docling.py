@@ -6,10 +6,9 @@ from typing import TYPE_CHECKING
 from docling.datamodel.document import DocumentStream, InputFormat
 from docling.document_converter import DocumentConverter
 from docling.exceptions import BaseError as DoclingError
-from docling_core.types.doc import (
+from docling_core.types.doc.document import (
     CodeItem,
     DocItem,
-    DocItemLabel,
     DoclingDocument,
     ListItem,
     PictureItem,
@@ -18,6 +17,7 @@ from docling_core.types.doc import (
     TextItem,
     TitleItem,
 )
+from docling_core.types.doc.labels import DocItemLabel
 
 from siteops_rag.converter.base import (
     ConversionError,
