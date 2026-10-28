@@ -11,10 +11,10 @@ class ConversionError(Exception):
     """The input has a supported format but could not be converted."""
 
 
-class DocumentMarkdownConverter(ABC):
+class AbstractDocumentConverter(ABC):
 
     """The abstraction of the Document -> Markdown pipeline"""
 
     @abstractmethod
     def convert_to_elements(self, data : bytes, media_type : str) -> list[Element]:
-        """return the document as markdownwith page markers."""
+        """return a list of Elements from the input data"""

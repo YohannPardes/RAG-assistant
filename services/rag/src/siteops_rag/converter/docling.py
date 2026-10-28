@@ -3,36 +3,28 @@ from __future__ import annotations
 from io import BytesIO
 from typing import TYPE_CHECKING
 
-from docling.datamodel.document import DocumentStream, InputFormat
+from docling.datamodel.base_models import InputFormat
 from docling.document_converter import DocumentConverter
 from docling.exceptions import BaseError as DoclingError
-from docling_core.types.doc.document import (
-    CodeItem,
-    DocItem,
-    DoclingDocument,
-    ListItem,
-    PictureItem,
-    SectionHeaderItem,
-    TableItem,
-    TextItem,
-    TitleItem,
-)
-from docling_core.types.doc.labels import DocItemLabel
+from docling_core.types.doc.document import DoclingDocument
+from docling_core.types.doc.items.code import CodeItem
+from docling_core.types.doc.items.node import DocItem
+from docling_core.types.doc.items.picture.picture import PictureItem
+from docling_core.types.doc.items.table.table import TableItem
+from docling_core.types.doc.items.text import ListItem, SectionHeaderItem, TextItem, TitleItem
+from docling_core.types.doc.labels import CodeLanguageLabel, DocItemLabel
+from docling_core.types.io import DocumentStream
 
 from siteops_rag.converter.base import (
+    AbstractDocumentConverter,
     ConversionError,
-    DocumentMarkdownConverter,
     UnsupportedMediaType,
 )
 from siteops_rag.converter.text import TextMarkdownConverter
-from siteops_rag.models import Element
+from siteops_rag.models import Element, TableRows, render_table
 
 if TYPE_CHECKING:
     from docling.datamodel.document import ConversionResult
-
-
-PAGE_BREAK = "<!-- page-break -->"
-IMAGE_PLACEHOLDER = "<!-- image -->"
 
 # Docling detects the format from the file extension, so each media type maps to one.
 _EXTENSIONS = {
@@ -50,7 +42,7 @@ _PARAGRAPH_LABELS = {
 }
 
 
-class DoclingMarkdownConverter(DocumentMarkdownConverter):
+class DoclingDocumentConverter(AbstractDocumentConverter):
     def __init__(self) -> None:
         super().__init__()
         self.converter = DocumentConverter(
@@ -58,7 +50,6 @@ class DoclingMarkdownConverter(DocumentMarkdownConverter):
         )
         self.text_converter = TextMarkdownConverter()
     def convert_to_elements(self, data: bytes, media_type: str) -> list[Element]:
-        # Docling has no plain-text input format; plain text is already valid markdown.
         if media_type == "text/plain":
             return self.text_converter.convert_to_elements(data, media_type=media_type)
 
@@ -71,32 +62,37 @@ class DoclingMarkdownConverter(DocumentMarkdownConverter):
             result = self.converter.convert(stream)
         except DoclingError as exc:
             raise ConversionError(str(exc)) from exc
-        return DoclingMarkdownConverter.elements_from_result(result)
+        return DoclingDocumentConverter.elements_from_result(result)
 
 
     @staticmethod
     def elements_from_result(result: ConversionResult) -> list[Element]:
-        return DoclingMarkdownConverter.elements_from_document(result.document)
+        return DoclingDocumentConverter.elements_from_document(result.document)
 
     @staticmethod
     def elements_from_document(doc: DoclingDocument) -> list[Element]:
         elements: list[Element] = []
         for item, _depth in doc.iterate_items():
-            element = DoclingMarkdownConverter._to_element(item, doc)
+            element = DoclingDocumentConverter._to_element(item, doc)
             if element is not None and element.text.strip():
                 elements.append(element)
         return elements
 
     @staticmethod
     def _page(item: DocItem) -> int | None:
-        """Exctract the page number, if any."""
+        """Extract the page number, if any."""
         return item.prov[0].page_no if item.prov else None
+
+    @staticmethod
+    def _table_rows(item: TableItem) -> TableRows:
+        """The table as a matrix of cell texts; merged cells repeat their text in every slot."""
+        return tuple(tuple(cell.text for cell in row) for row in item.data.grid)
 
     @staticmethod
     def _to_element(item: object, doc: DoclingDocument) -> Element | None:
         if not isinstance(item, DocItem):
             return None  # groups (lists, sections) carry no text of their own
-        page = DoclingMarkdownConverter._page(item)
+        page = DoclingDocumentConverter._page(item)
 
         # Order matters: TitleItem, SectionHeaderItem, ListItem and CodeItem are all TextItems.
         if isinstance(item, TitleItem):
@@ -104,13 +100,19 @@ class DoclingMarkdownConverter(DocumentMarkdownConverter):
         if isinstance(item, SectionHeaderItem):
             return Element("heading", item.text, page, level=item.level)
         if isinstance(item, CodeItem):
-            return Element("code", item.text, page)
+            # Often UNKNOWN: the chunk is then fenced without a language.
+            unknown = item.code_language == CodeLanguageLabel.UNKNOWN
+            language = None if unknown else item.code_language.value.lower()
+            return Element("code", item.text, page, language=language)
         if isinstance(item, ListItem):
             marker = item.marker or "-"
             return Element("paragraph", f"{marker} {item.text}", page)
         if isinstance(item, TableItem):
-            # export_to_markdown already puts the table's caption above it.
-            return Element("table", item.export_to_markdown(doc), page)
+            # Read the structured grid, not export_to_markdown(): the markdown export
+            # escapes pipes inside cells as "&#124;", which breaks shell commands.
+            rows = DoclingDocumentConverter._table_rows(item)
+            text = render_table(rows, caption=item.caption_text(doc))
+            return Element("table", text, page, rows=rows)
         if isinstance(item, PictureItem):
             # The image itself is not searchable; its caption is the only trace of it.
             caption = item.caption_text(doc)
