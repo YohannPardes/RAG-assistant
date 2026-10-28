@@ -166,6 +166,14 @@ class Chunker:
         """Chunk one row that is too big for table form: one "column : value" line per cell,
         packing as many whole cells as fit into each chunk.
         """
+        # every chunk after the first starts with the row key (first column), so it says which row it belongs to
+        # (skipped when the key is the only column, or too long to repeat)
+        key = f"{header[0]} : {row[0]}" if len(header) > 1 and row else ""
+        if key and self.length_func(key) <= limit // 2:
+            limit -= self.length_func(key + "\n")
+        else:
+            key = ""
+
         chunks = []
         current_cells: list[str] = []
         for name, value in zip(header, row, strict=False):
@@ -193,7 +201,11 @@ class Chunker:
 
         if current_cells:
             chunks.append("\n".join(current_cells))
-        return chunks
+        if not key:
+            return chunks
+        # a first chunk holding only the key adds nothing: every other chunk repeats it
+        first = chunks[:1] if chunks and chunks[0] != key else []
+        return first + [f"{key}\n{chunk}" for chunk in chunks[1:]]
 
     def _chunk_code(self, code : Element, limit : int) -> list[str]:
         """Chunk a code block between lines only (blank lines first, then line breaks), never inside a line.
