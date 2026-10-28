@@ -1,0 +1,71 @@
+RB-415: HIGH API LATENCY
+========================
+
+Service:        public-api (k8s namespace: api)
+Severity:       SEV-2
+Owner:          API Platform team
+Last reviewed:  2026-09-21
+
+
+1. SYMPTOMS
+-----------
+
+  * Alert ApiLatencyP99High fires: p99 latency above 800 ms for 5 minutes.
+  * Error budget burn rate above 2x on the "api-availability" SLO.
+  * Customers report timeouts on POST /v2/orders.
+
+
+2. LATENCY TARGETS
+------------------
+
+  +-------------------+---------+---------+-----------+
+  | Endpoint          | p50     | p99     | Timeout   |
+  +-------------------+---------+---------+-----------+
+  | GET  /v2/orders   | 40 ms   | 300 ms  | 2 s       |
+  | POST /v2/orders   | 90 ms   | 800 ms  | 5 s       |
+  | GET  /v2/search   | 120 ms  | 1200 ms | 5 s       |
+  +-------------------+---------+---------+-----------+
+
+
+3. DIAGNOSIS
+------------
+
+3.1 Is it one pod or all of them?
+
+    kubectl -n api top pods --sort-by=cpu
+    kubectl -n api get hpa public-api
+
+  If only one pod is slow, delete it and let the deployment replace it:
+
+    kubectl -n api delete pod <POD_NAME>
+
+3.2 Is a dependency slow?
+
+  Check the downstream latency panel in the "public-api / dependencies"
+  Grafana dashboard. The usual suspects, in order:
+
+    1. orders-db (see RB-204 if the primary is down)
+    2. redis-cache (hit ratio below 85% means a cold cache)
+    3. search-service
+
+
+4. REMEDIATION
+--------------
+
+  1. If CPU is above 80% on all pods, scale out:
+       kubectl -n api scale deployment public-api --replicas=12
+  2. If a deploy happened in the last hour, roll it back:
+       kubectl -n api rollout undo deployment public-api
+  3. If redis hit ratio is low, warm the cache:
+       kubectl -n api create job warm-cache --from=cronjob/cache-warmer
+
+  WARNING: do not raise the HPA maxReplicas above 20; orders-db allows
+  at most 400 connections through pgbouncer.
+
+
+5. ESCALATION
+-------------
+
+  L1  On-call SRE              #ops-oncall
+  L2  API Platform on-call     PagerDuty: api-platform
+  L3  Engineering manager      only for SEV-1 or more than 1 hour of impact
