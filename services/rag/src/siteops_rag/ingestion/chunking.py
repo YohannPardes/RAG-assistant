@@ -1,6 +1,7 @@
 import logging
 import uuid
 from collections.abc import Callable
+from itertools import zip_longest
 
 from siteops_rag.models import Chunk, Document, Element, render_table
 
@@ -122,7 +123,6 @@ class Chunker:
         # fallback: chunk it as regular text
         return self._chunk_regular_text(elem.text, limit=limit)
         
-
     def _chunk_table(self, table : Element, limit : int) -> list[str]:
         """Chunk a table by rows, repeating the header in every chunk so each one reads on its own."""
 
@@ -131,6 +131,10 @@ class Chunker:
             return self._chunk_regular_text(table.text, limit=limit)
 
         header, *body = table.rows
+
+        if len(body) == 0:
+            # a table with only a header is not very useful, but it is still a table: return the header as one chunk
+            return self._chunk_regular_text(table.text, limit=limit)
 
         chunks = []
         current_rows: list[tuple[str, ...]] = []
@@ -176,7 +180,7 @@ class Chunker:
 
         chunks = []
         current_cells: list[str] = []
-        for name, value in zip(header, row, strict=False):
+        for name, value in zip_longest(header, row, fillvalue=""):
             label = f"{name} : "
             cell = label + value
 

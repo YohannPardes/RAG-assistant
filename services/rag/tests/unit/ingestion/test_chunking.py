@@ -226,6 +226,23 @@ def test_every_chunk_of_a_split_row_starts_with_the_row_key() -> None:
     assert len(chunks) > 1
     assert all(c.text.startswith("Step : Rebuild\n") for c in chunks)  # no chunk holds the key alone
 
+def test_header_only_table_too_long_is_not_lost() -> None:
+    header = ("Mount", "Warning threshold", "Critical threshold", "Action to take")
+    rows = (header,)
+
+    chunks = _chunk(_doc(Element("table", render_table(rows), rows=rows)), max_chars=40)
+
+    text = "".join(c.text for c in chunks)
+    assert all(name in text for name in header)
+
+def test_no_cell_of_a_split_row_is_lost() -> None:
+    # the row has one cell more than the header, and is too big for table form
+    rows = (("Step", "Command"), ("Rebuild", "patronictl reinit orders-db db-primary-01 then wait", "EXTRA-CELL"))
+
+    chunks = _chunk(_doc(Element("table", render_table(rows), rows=rows)), max_chars=60)
+
+    assert any("EXTRA-CELL" in c.text for c in chunks)
+
 def test_pipe_in_a_cell_is_escaped() -> None:
     rows = (("Command",), ("du -sh * | sort -h",))
 
