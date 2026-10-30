@@ -1,0 +1,14 @@
+embedding:
+  base_url: http://localhost:8001/v1
+  model: BAAI/bge-m3
+  dimension: 1024
+  batch_size: 32
+
+llm:
+  base_url: http://localhost:8000/v1
+  model: …
+
+chunking:
+  max_length: 1000
+
+qdrant_url: http://localhost:6333

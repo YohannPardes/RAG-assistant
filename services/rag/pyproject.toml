@@ -5,12 +5,16 @@ description = "RAG service: ingests runbooks and answers /ask and /search with c
 requires-python = ">=3.12"                       # minimum Python version
 dependencies = [                                 # runtime dependencies, installed in this service's image
     "pydantic>=2",                               # data models and validation
+    "pydantic-settings[yaml]>=2.16.1",
     "siteops-common",                            # shared wire contracts
 ]
 
 [project.optional-dependencies]
 docling = [
     "docling>=2.143.0",
+]
+openai-compat = [
+    "httpx>=0.28.1",
 ]
 
 [tool.uv.sources]                                # where uv gets dependencies from, instead of PyPI

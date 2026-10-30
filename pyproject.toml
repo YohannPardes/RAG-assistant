@@ -6,6 +6,7 @@ dev = [                                          # `dev` is synced by default
     "pytest>=8",                                 # test runner
     "ruff>=0.6",                                 # linter + formatter
     "mypy>=1.11",                                # static type checker
+    "httpx>=0.28.1",
 ]
 
 [tool.ruff]                                      # settings shared by lint and format

@@ -23,6 +23,7 @@ members = [
 
 [manifest.dependency-groups]
 dev = [
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "mypy", specifier = ">=1.11" },
     { name = "pytest", specifier = ">=8" },
     { name = "ruff", specifier = ">=0.6" },
@@ -1937,6 +1938,11 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/3c/74/fdf926afe145d8629c4b2ff57f4ea1d64ed7abc4d84d97463b2517a2547e/pydantic_settings-2.16.1-py3-none-any.whl", hash = "sha256:30f5313340da4e8f1b440d1910b92a5bc3ccbb6b4ba70ec2b8395bc921f418f5", size = 80771, upload-time = "2026-10-20T11:37:17.298Z" },
 ]
 
+[package.optional-dependencies]
+yaml = [
+    { name = "pyyaml" },
+]
+
 [[package]]
 name = "pygments"
 version = "2.21.0"
@@ -2675,6 +2681,7 @@ version = "0.1.0"
 source = { editable = "services/rag" }
 dependencies = [
     { name = "pydantic" },
+    { name = "pydantic-settings", extra = ["yaml"] },
     { name = "siteops-common" },
 ]
 
@@ -2682,14 +2689,19 @@ dependencies = [
 docling = [
     { name = "docling" },
 ]
+openai-compat = [
+    { name = "httpx" },
+]
 
 [package.metadata]
 requires-dist = [
     { name = "docling", marker = "extra == 'docling'", specifier = ">=2.143.0" },
+    { name = "httpx", marker = "extra == 'openai-compat'", specifier = ">=0.28.1" },
     { name = "pydantic", specifier = ">=2" },
+    { name = "pydantic-settings", extras = ["yaml"], specifier = ">=2.16.1" },
     { name = "siteops-common", editable = "packages/common" },
 ]
-provides-extras = ["docling"]
+provides-extras = ["docling", "openai-compat"]
 
 [[package]]
 name = "siteops-tickets"
