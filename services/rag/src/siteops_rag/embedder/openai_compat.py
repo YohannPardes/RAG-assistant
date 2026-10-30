@@ -13,14 +13,16 @@ class OpenAICompatEmbedder(Embedder):
                  model_name: str, 
                  timeout: float = 30.0, 
                  batch_size: int = 32,
+                 dimension: int = 1024,
                  max_retries: int = 3,
                  transport: httpx.HTTPTransport | None = None,
                  api_key: str = "EMPTY"):
         
+        super().__init__(dimension = dimension, batch_size=batch_size)
+        
         self.base_url = base_url
         self.model_name = model_name
         self.timeout = timeout
-        self.batch_size = batch_size
 
         self._client = httpx.Client(
             base_url=base_url,
@@ -30,17 +32,12 @@ class OpenAICompatEmbedder(Embedder):
             transport=transport or httpx.HTTPTransport(retries=max_retries),
         )
 
-    def _embed_batch(self, texts: list[str]) -> list[Vector]:
-        self._validate_input(texts)
-        if len(texts) == 0:
-            return []
-
     def close(self) -> None:
         self._client.close()
 
     def _embed_batch(self, texts: list[str]) -> list[Vector]:
         try:
-            response = self._client.post("/embeddings", json={"model": self.model, "input": texts})
+            response = self._call_client(texts)
             response.raise_for_status()
             data = response.json()["data"]
             return [item["embedding"] for item in sorted(data, key=lambda d: d["index"])]
@@ -48,3 +45,9 @@ class OpenAICompatEmbedder(Embedder):
             raise EmbeddingError(f"embedding request failed: {exc}") from exc
         except (KeyError, TypeError, ValueError) as exc:  # body is not the expected JSON shape
             raise EmbeddingError(f"malformed embedding response: {exc}") from exc
+
+    def _call_client(self, texts, **kwargs):
+        kwargs.setdefault("model", self.model_name)
+        kwargs.setdefault("input", texts)
+        response = self._client.post("/embeddings", json=kwargs)
+        return response
