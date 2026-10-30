@@ -5,6 +5,7 @@ description = "RAG service: ingests runbooks and answers /ask and /search with c
 requires-python = ">=3.12"                       # minimum Python version
 dependencies = [                                 # runtime dependencies, installed in this service's image
     "pydantic>=2",                               # data models and validation
+    "pydantic-settings[yaml]>=2.16.1",
     "siteops-common",                            # shared wire contracts
 ]
 
