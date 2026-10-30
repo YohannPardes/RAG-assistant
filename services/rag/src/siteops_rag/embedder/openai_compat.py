@@ -1,7 +1,6 @@
 import logging
-
 import httpx
-
+from typing import Any
 from siteops_rag.embedder.base import Embedder, EmbeddingError, Vector
 
 logger = logging.getLogger(__name__)
@@ -46,7 +45,7 @@ class OpenAICompatEmbedder(Embedder):
         except (KeyError, TypeError, ValueError) as exc:  # body is not the expected JSON shape
             raise EmbeddingError(f"malformed embedding response: {exc}") from exc
 
-    def _call_client(self, texts, **kwargs) -> httpx.Response:
+    def _call_client(self, texts: list[str], **kwargs: Any) -> httpx.Response:
         kwargs.setdefault("model", self.model_name)
         kwargs.setdefault("input", texts)
         
