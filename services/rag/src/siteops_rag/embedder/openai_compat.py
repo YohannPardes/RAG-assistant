@@ -1,6 +1,8 @@
 import logging
-import httpx
 from typing import Any
+
+import httpx
+
 from siteops_rag.embedder.base import Embedder, EmbeddingError, Vector
 
 logger = logging.getLogger(__name__)
