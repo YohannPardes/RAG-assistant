@@ -46,8 +46,9 @@ class OpenAICompatEmbedder(Embedder):
         except (KeyError, TypeError, ValueError) as exc:  # body is not the expected JSON shape
             raise EmbeddingError(f"malformed embedding response: {exc}") from exc
 
-    def _call_client(self, texts, **kwargs):
+    def _call_client(self, texts, **kwargs) -> httpx.Response:
         kwargs.setdefault("model", self.model_name)
         kwargs.setdefault("input", texts)
+        
         response = self._client.post("/embeddings", json=kwargs)
         return response

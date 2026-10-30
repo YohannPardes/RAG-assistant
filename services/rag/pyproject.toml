@@ -12,6 +12,9 @@ dependencies = [                                 # runtime dependencies, install
 docling = [
     "docling>=2.143.0",
 ]
+openai-compat = [
+    "httpx>=0.28.1",
+]
 
 [tool.uv.sources]                                # where uv gets dependencies from, instead of PyPI
 siteops-common = { workspace = true }            # use the workspace member in packages/common

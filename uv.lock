@@ -2682,14 +2682,18 @@ dependencies = [
 docling = [
     { name = "docling" },
 ]
+openai-compat = [
+    { name = "httpx" },
+]
 
 [package.metadata]
 requires-dist = [
     { name = "docling", marker = "extra == 'docling'", specifier = ">=2.143.0" },
+    { name = "httpx", marker = "extra == 'openai-compat'", specifier = ">=0.28.1" },
     { name = "pydantic", specifier = ">=2" },
     { name = "siteops-common", editable = "packages/common" },
 ]
-provides-extras = ["docling"]
+provides-extras = ["docling", "openai-compat"]
 
 [[package]]
 name = "siteops-tickets"
