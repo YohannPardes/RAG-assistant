@@ -18,6 +18,7 @@ from docling_core.types.io import DocumentStream
 from siteops_rag.converter.base import (
     AbstractDocumentConverter,
     ConversionError,
+    RawDocument,
     UnsupportedMediaType,
 )
 from siteops_rag.converter.text import TextMarkdownConverter
@@ -45,13 +46,15 @@ _PARAGRAPH_LABELS = {
 class DoclingDocumentConverter(AbstractDocumentConverter):
     def __init__(self) -> None:
         super().__init__()
-        self.converter = DocumentConverter(
-            allowed_formats=[InputFormat.PDF, InputFormat.DOCX, InputFormat.MD]
-        )
+        self.converter = DocumentConverter(allowed_formats=[InputFormat.PDF, InputFormat.DOCX, InputFormat.MD])
         self.text_converter = TextMarkdownConverter()
-    def convert_to_elements(self, data: bytes, media_type: str) -> list[Element]:
+
+    def convert_to_elements(self, raw_document: RawDocument) -> list[Element]:
+        media_type = raw_document.media_type
+        data = raw_document.data
+
         if media_type == "text/plain":
-            return self.text_converter.convert_to_elements(data, media_type=media_type)
+            return self.text_converter.convert_to_elements(raw_document)
 
         extension = _EXTENSIONS.get(media_type)
         if extension is None:
@@ -63,7 +66,6 @@ class DoclingDocumentConverter(AbstractDocumentConverter):
         except DoclingError as exc:
             raise ConversionError(str(exc)) from exc
         return DoclingDocumentConverter.elements_from_result(result)
-
 
     @staticmethod
     def elements_from_result(result: ConversionResult) -> list[Element]:

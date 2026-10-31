@@ -15,7 +15,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 | `scope`   | [1. Scope &amp; evaluation](#1-scope--evaluation)                                                         | scope/1 – scope/6     |
 | `arch`    | [2. Architecture &amp; service boundaries](#2-architecture--service-boundaries)                           | arch/1 – arch/11      |
 | `design`  | [3. Code design &amp; dependency injection](#3-code-design--dependency-injection)                         | design/1 – design/4   |
-| `rag`     | [4. RAG pipeline: ingestion, retrieval &amp; generation](#4-rag-pipeline-ingestion-retrieval--generation) | rag/1 – rag/11        |
+| `rag`     | [4. RAG pipeline: ingestion, retrieval &amp; generation](#4-rag-pipeline-ingestion-retrieval--generation) | rag/1 – rag/13        |
 | `agent`   | [5. Agent, access &amp; safety](#5-agent-access--safety)                                                  | agent/1 – agent/8     |
 | `tooling` | [6. Tooling, packaging &amp; testing](#6-tooling-packaging--testing)                                      | tooling/1 – tooling/6 |
 
@@ -23,7 +23,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 
 | Priority                       | Decisions                                                                                                                                                                                                                                                                                              |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **P1 — before code**    | rag/4 LLM + serving · rag/5 embedding model · agent/2 access levels                                                                                                                                                                        |
+| **P1 — before code**    | rag/5 embedding model · agent/2 access levels                                                                                                                                                                                              |
 | **P2 — while building** | rag/6 chunking · rag/7 retrieval depth · rag/8 reranker model · rag/9 "I don't know" rule · rag/10 citations · agent/3 ticket fingerprint · agent/4 agent loop · agent/5 auth · scope/4 golden set · scope/5 eval thresholds · arch/7 timeouts/retries · arch/8 persistence · tooling/6 CI |
 | **P3 — cut candidates** | rag/11 hybrid search · scope/6 LLM-judge metric · arch/9 distributed tracing · agent/6 scheduled triage · arch/10 backups                                                                                                                                                                          |
 
@@ -213,9 +213,10 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 
 ### rag/4 — LLM: model and serving runtime
 
-**Status:** Open · **Priority:** P1
+**Status:** Decided (2026-10-31)
 
 - Which model, served by vLLM, Ollama or a proxy. Fixes the `llm` container in `docker-compose.yml` and what `llm.py`'s OpenAI-compatible client points at.
+- **Decision:** `qwen3.5:27b` served by **Ollama**, reached through its OpenAI-compatible API (`llm.base_url: http://localhost:11434/v1`). The code only speaks that API, so changing server or model is config only.
 
 ### rag/5 — Embedding model
 
@@ -243,21 +244,43 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 
 ### rag/9 — "I don't know" rule
 
-**Status:** Open · **Priority:** P2
+**Status:** Proposed · **Priority:** P2
 
 - Score threshold on retrieved chunks, LLM judgment, or both.
+- **Recommendation (implemented in `rag.py`):** LLM judgment, checked. Nothing retrieved → "I don't know" without calling the LLM; otherwise the answer counts only if at least one of its citations passes rag/10's check. `AskResponse.answered` carries the result.
+- **Why:** no score threshold until scope/5's eval gives numbers to set one from; the citation check stops an answer the excerpts don't support.
+- **Cost:** a correct answer with a badly copied quote is reported as "I don't know".
 
 ### rag/10 — Citation format and check
 
-**Status:** Open · **Priority:** P2
+**Status:** Proposed · **Priority:** P2
 
 - Cite by page, section or chunk ID; how a citation is verified to exist in the retrieved context.
+- **Recommendation (implemented in `rag.py`):** the LLM gets numbered excerpts and replies in JSON with `{"excerpt": n, "quote": "..."}` citations. A citation is kept only if `n` is a retrieved excerpt and the quote appears in its text word for word (whitespace ignored). `Citation` carries `chunk_id`, source, heading path, page and the quote.
+- **Why:** checkable without an LLM judge; the eval can re-run the same check on `AskResponse`.
+- **Cost:** needs a server with JSON mode (`response_format`); small models may paraphrase quotes, which drops the citation.
 
 ### rag/11 — Hybrid search (BM25 + vectors)
 
 **Status:** Open · **Priority:** P3 (cut candidate)
 
 - Error codes are exact tokens, which is where keyword search helps; only worth it if scope/5's recall numbers show a gap.
+
+### rag/12 — `upsert` replaces its sources: write, then delete their stale chunks
+
+**Status:** Decided (2026-10-31)
+
+- `VectorStore.upsert(chunks, embeddings)` treats the chunks as the complete set for their sources: it writes them, then deletes those sources' chunks whose ID is not among them. The pipeline calls it once per document, after embedding.
+- **Why:** rag/3's deterministic IDs only overwrite unchanged chunks; an edited or removed section keeps its old point forever. Write-first means a crash between the two steps leaves a few stale chunks (cleaned up on the next run), never a missing runbook.
+- **Cost:** a source's chunks must arrive in one `upsert` call (no splitting a document over several). A document that becomes empty sends no chunks, so the pipeline calls `delete_by_source` for it instead. Not atomic. Files deleted from the runbooks folder are not cleaned up; that needs a sweep over stored sources.
+
+### rag/13 — Similarity metric: cosine only
+
+**Status:** Decided (2026-10-31)
+
+- Every `VectorStore` scores by cosine similarity (higher = more similar); Qdrant collections are created with `Distance.COSINE`. No configurable metric.
+- **Why:** embedding models like bge-m3 are trained for cosine; one metric keeps scores comparable across stores, so the contract tests and a future score threshold (rag/9) hold for all of them.
+- **Cost:** a model trained for dot product or Euclidean would need this revisited, and the collection recreated.
 
 ---
 

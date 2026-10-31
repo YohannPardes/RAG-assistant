@@ -1,14 +1,16 @@
 embedding:
-  base_url: http://localhost:8001/v1
-  model: BAAI/bge-m3
+  base_url: http://localhost:11434/v1 # Ollama's OpenAI-compatible API 
+  model: bge-m3
   dimension: 1024
   batch_size: 32
 
 llm:
-  base_url: http://localhost:8000/v1
-  model: …
+  base_url: http://localhost:11434/v1   # Ollama's OpenAI-compatible API 
+  model: qwen3.5:27b
+  reasoning_effort: "none"   # thinking off: ~10x faster answers; low / medium / high turn it back on
 
 chunking:
   max_length: 1000
 
-qdrant_url: http://localhost:6333
+vector_store:
+  url: http://localhost:6333

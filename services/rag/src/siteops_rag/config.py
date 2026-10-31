@@ -52,6 +52,8 @@ class LLMSettings(_Section):
     timeout: float = Field(default=120.0, gt=0)
     max_retries: int = Field(default=2, ge=0)
     temperature: float = Field(default=0.0, ge=0)
+    # thinking models: "none" turns thinking off (Ollama); None = don't send it, the server's default applies
+    reasoning_effort: Literal["none", "low", "medium", "high"] | None = None
 
 
 class ChunkingSettings(_Section):

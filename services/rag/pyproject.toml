@@ -4,9 +4,11 @@ version = "0.1.0"                                # package version
 description = "RAG service: ingests runbooks and answers /ask and /search with citations. Owns the vector store."  # one-line summary
 requires-python = ">=3.12"                       # minimum Python version
 dependencies = [                                 # runtime dependencies, installed in this service's image
+    "fastapi>=0.162.0",
     "pydantic>=2",                               # data models and validation
     "pydantic-settings[yaml]>=2.16.1",
     "siteops-common",                            # shared wire contracts
+    "uvicorn>=0.54.0",
 ]
 
 [project.optional-dependencies]

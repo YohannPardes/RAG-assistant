@@ -28,6 +28,7 @@ rag_project/
 │   └── src/siteops_common/
 │       ├── __init__.py
 │       └── contracts.py        SHARED  AskRequest/Response, SearchRequest/Response, TicketCreate, Ticket
+│   └── tests/test_contracts.py   validation rules, wire round trip
 │
 ├── services/rag/
 │   ├── pyproject.toml   Dockerfile
@@ -41,19 +42,27 @@ rag_project/
 │   │   │   ├── chunking.py     CORE    Elements → Chunks
 │   │   │   └── pipeline.py     CORE    parse → chunk → embed → store  (run as a job)
 │   │   ├── converter/    base.py  docling.py  text.py      INTERFACE + ADAPTERS  document bytes → markdown
-│   │   ├── embedder/     base.py  http.py     fake.py
+│   │   ├── embedder/     base.py  openai_compat.py  fake.py
 │   │   ├── vector_store/ base.py  qdrant.py   memory.py
 │   │   ├── reranker/     base.py  cross_encoder.py  passthrough.py
 │   │   └── llm/          base.py  openai_compat.py  fake.py
 │   └── tests/                  rag only; under unit/ and integration/, subfolders mirror src/
-│       ├── conftest.py             fixtures_dir fixture (shared)
+│       ├── conftest.py             fixtures_dir, qdrant_url (skips without a Qdrant server) (shared)
 │       ├── unit/                   fast tier, no optional extras
+│       │   ├── conftest.py         fake adapters, a RAG built on them, API clients
+│       │   ├── test_rag.py  test_api.py  test_config.py  test_container.py  test_ingest_script.py
 │       │   ├── converter/test_text.py
-│       │   └── vector_store/test_base.py   contract suite: memory (fast) + qdrant (`integration`)
-│       ├── integration/            marked `integration`; run with `pytest -m integration`
-│       │   ├── conftest.py         docling_converter fixture (session; Docling required, imported lazily)
-│       │   └── converter/test_docling.py
-│       ├── ingestion/test_chunking.py    (uncommitted chunker work; not yet under unit/)
+│       │   ├── embedder/           test_base.py  test_fake.py  test_openai_compat.py
+│       │   ├── ingestion/          test_chunking.py  test_pipeline.py
+│       │   ├── llm/                test_fake.py  test_openai_compat.py
+│       │   └── vector_store/test_base.py   contract suite: memory (fast) + qdrant in-process and server (`integration`)
+│       ├── integration/            marked `integration`; run with `pytest -m integration`; skips what isn't running
+│       │   ├── conftest.py         docling_converter, Ollama and live settings, `ingested` (fixtures ingested once)
+│       │   ├── test_api.py         real lifespan: /search, /ask answered and "I don't know"
+│       │   ├── converter/test_docling.py
+│       │   ├── embedder/test_ollama.py   llm/test_ollama.py
+│       │   ├── ingestion/test_pipeline.py
+│       │   └── vector_store/test_qdrant.py
 │       └── fixtures/               sample runbooks, one per supported format
 │           ├── runbook_disk_full.pdf      runbook_db_failover.docx
 │           ├── runbook_cert_expiry.md     runbook_high_latency.txt
@@ -85,6 +94,6 @@ rag_project/
 ├── tests/                      SYSTEM  cross-service only
 │   ├── e2e/                    agent → rag → tickets for real
 │   └── eval/                   recall@5, triage precision/recall
-├── scripts/                    generate_logs.py, run_eval.py
-└── data/                       runbooks/, logs/, golden_set.jsonl
+├── scripts/                    ingest.py, generate_logs.py, run_eval.py
+└── data/                       runbooks/ (copies of services/rag/tests/fixtures/, read by scripts/ingest.py), logs/, golden_set.jsonl
 ```
