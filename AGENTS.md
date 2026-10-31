@@ -59,6 +59,7 @@ rag_project/
 │       ├── integration/            marked `integration`; run with `pytest -m integration`; skips what isn't running
 │       │   ├── conftest.py         docling_converter, Ollama and live settings, `ingested` (fixtures ingested once)
 │       │   ├── test_api.py         real lifespan: /search, /ask answered and "I don't know"
+│       │   ├── test_golden_set.py  every golden-set label names a section that ingesting data/runbooks produces
 │       │   ├── converter/test_docling.py
 │       │   ├── embedder/test_ollama.py   llm/test_ollama.py
 │       │   ├── ingestion/test_pipeline.py

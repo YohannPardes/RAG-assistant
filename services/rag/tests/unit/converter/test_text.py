@@ -2,12 +2,22 @@ import pytest
 
 from siteops_rag.converter.base import ConversionError, RawDocument, UnsupportedMediaType
 from siteops_rag.converter.text import TextMarkdownConverter
+from siteops_rag.ingestion.chunking import Chunker
+from siteops_rag.models import Document
+
+# strict: once headings are detected these pass, and the marker must go so they guard against a regression
+NO_TXT_HEADINGS = pytest.mark.xfail(strict=True, reason="TextMarkdownConverter emits paragraphs only, no headings")
 
 
 def convert(text: str | bytes, media_type: str = "text/plain") -> list[tuple[str, str]]:
     data = text.encode() if isinstance(text, str) else text
     elements = TextMarkdownConverter().convert_to_elements(RawDocument("runbook.txt", data, media_type))
     return [(e.kind, e.text) for e in elements]
+
+
+def headings(text: str) -> list[tuple[int | None, str]]:
+    elements = TextMarkdownConverter().convert_to_elements(RawDocument("runbook.txt", text.encode(), "text/plain"))
+    return [(e.level, e.text) for e in elements if e.kind == "heading"]
 
 
 def test_blank_lines_separate_paragraphs() -> None:
@@ -43,3 +53,37 @@ def test_other_media_types_are_unsupported() -> None:
 def test_bytes_that_are_not_utf8_are_a_conversion_error() -> None:
     with pytest.raises(ConversionError):
         convert(b"\xff\xfe broken")
+
+
+@NO_TXT_HEADINGS
+def test_underlined_lines_are_headings() -> None:
+    # same levels as Docling gives a markdown runbook: "=" underlines the title, "-" a numbered section
+    text = "RB-415: HIGH API LATENCY\n========================\n\n1. SYMPTOMS\n-----------\n\nAlert fires."
+
+    assert headings(text) == [(0, "RB-415: HIGH API LATENCY"), (1, "1. SYMPTOMS")]
+
+
+@NO_TXT_HEADINGS
+def test_a_numbered_line_on_its_own_is_a_heading_one_level_deeper_per_number() -> None:
+    text = "3. DIAGNOSIS\n------------\n\n3.1 Is it one pod or all of them?\n\n    kubectl -n api top pods"
+
+    assert headings(text) == [(1, "3. DIAGNOSIS"), (2, "3.1 Is it one pod or all of them?")]
+
+
+def test_a_numbered_step_spanning_several_lines_is_not_a_heading() -> None:
+    text = "1. If CPU is above 80% on all pods, scale out:\n     kubectl -n api scale deployment public-api --replicas=12"
+
+    assert headings(text) == []
+
+
+@NO_TXT_HEADINGS
+def test_every_chunk_of_the_txt_runbook_has_a_section(fixtures_dir) -> None:
+    # without one, a chunk can't be cited by section and never matches a golden-set label (scope/4)
+    raw = RawDocument("runbook_high_latency.txt", (fixtures_dir / "runbook_high_latency.txt").read_bytes(), "text/plain")
+    elements = TextMarkdownConverter().convert_to_elements(raw)
+    chunks = Chunker(max_length=1000).chunk_elements(Document(source=raw.source, elements=elements))
+
+    assert all(chunk.heading_path for chunk in chunks)
+    assert {"1. SYMPTOMS", "3.2 Is a dependency slow?", "4. REMEDIATION", "5. ESCALATION"} <= {
+        chunk.heading_path[-1] for chunk in chunks
+    }

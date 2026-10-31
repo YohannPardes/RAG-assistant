@@ -1,0 +1,39 @@
+{"question": "Which alert warns that a TLS certificate is about to expire, and how many days before expiry does it fire?", "expected_source": "runbook_cert_expiry.md", "expected_section": "1. Symptoms"}
+{"question": "Users see NET::ERR_CERT_DATE_INVALID in their browser. What is going on?", "expected_source": "runbook_cert_expiry.md", "expected_section": "1. Symptoms"}
+{"question": "How long before expiry does cert-manager normally renew a certificate, and with which ACME challenge?", "expected_source": "runbook_cert_expiry.md", "expected_section": "2. How renewal normally works"}
+{"question": "How do I list the status of every certificate in the Kubernetes cluster?", "expected_source": "runbook_cert_expiry.md", "expected_section": "3.1 Check the certificate status"}
+{"question": "cert-manager says 'too many certificates already issued'. What should I do?", "expected_source": "runbook_cert_expiry.md", "expected_section": "3.2 Common failure causes"}
+{"question": "Renewal fails because the issuer is not found. What needs fixing?", "expected_source": "runbook_cert_expiry.md", "expected_section": "3.2 Common failure causes"}
+{"question": "What permission scope does a new DNS provider API token need for cert-manager?", "expected_source": "runbook_cert_expiry.md", "expected_section": "4.1 Rotate the DNS API token"}
+{"question": "How do I manually trigger a renewal of the api-example-com certificate?", "expected_source": "runbook_cert_expiry.md", "expected_section": "4.1 Rotate the DNS API token"}
+{"question": "How can I check the expiry date of the certificate served on api.example.com after renewing it?", "expected_source": "runbook_cert_expiry.md", "expected_section": "4.2 Verify"}
+{"question": "Is it safe to delete the Certificate resource to force cert-manager to issue a new one?", "expected_source": "runbook_cert_expiry.md", "expected_section": "4.2 Verify"}
+{"question": "Who is the second-level contact for certificate expiry incidents?", "expected_source": "runbook_cert_expiry.md", "expected_section": "5. Escalation"}
+{"question": "Which team owns the PostgreSQL failover runbook, and what severity is a primary outage?", "expected_source": "runbook_db_failover.docx", "expected_section": "RB-204: PostgreSQL Primary Failover"}
+{"question": "The orders database primary is down and Patroni did not promote a replica on its own. Which runbook applies?", "expected_source": "runbook_db_failover.docx", "expected_section": "1. When to use this runbook"}
+{"question": "Writes fail with 'FATAL: the database system is in recovery mode'. When should I start a manual failover?", "expected_source": "runbook_db_failover.docx", "expected_section": "1. When to use this runbook"}
+{"question": "What is the maximum replication lag allowed before promoting the Postgres replica?", "expected_source": "runbook_db_failover.docx", "expected_section": "3. Pre-checks"}
+{"question": "How do I check that the replica is healthy before a database failover?", "expected_source": "runbook_db_failover.docx", "expected_section": "3. Pre-checks"}
+{"question": "Which patronictl command promotes db-replica-02 to primary?", "expected_source": "runbook_db_failover.docx", "expected_section": "4.1 Promote the replica"}
+{"question": "After promoting the new primary, what do I have to do with pgbouncer?", "expected_source": "runbook_db_failover.docx", "expected_section": "4.1 Promote the replica"}
+{"question": "How do I stop the old primary from accepting writes and causing split-brain?", "expected_source": "runbook_db_failover.docx", "expected_section": "4.2 Fence the old primary"}
+{"question": "After a failover, how do I rebuild db-primary-01 as a replica and optionally switch back to it?", "expected_source": "runbook_db_failover.docx", "expected_section": "5. Rollback"}
+{"question": "Who is the L3 escalation for a PostgreSQL failover and how do I reach them?", "expected_source": "runbook_db_failover.docx", "expected_section": "6. Escalation"}
+{"question": "Which hosts does the log-aggregator disk-space runbook cover, and which team owns it?", "expected_source": "runbook_disk_full.pdf", "expected_section": "RB-101: Disk Space Exhaustion on Log Servers"}
+{"question": "Applications are logging 'No space left on device' (errno 28). What does that indicate on the log servers?", "expected_source": "runbook_disk_full.pdf", "expected_section": "1. Symptoms"}
+{"question": "At what usage percentage is /var/log considered critical?", "expected_source": "runbook_disk_full.pdf", "expected_section": "2. Alert thresholds"}
+{"question": "The root filesystem is at 92% usage. What is the expected action?", "expected_source": "runbook_disk_full.pdf", "expected_section": "2. Alert thresholds"}
+{"question": "How do I find which directories take the most space under /var/log?", "expected_source": "runbook_disk_full.pdf", "expected_section": "4.1 Find what is using the space"}
+{"question": "Why can df and du disagree about disk usage, and how do I find the files responsible?", "expected_source": "runbook_disk_full.pdf", "expected_section": "4.2 Check for deleted files still held open"}
+{"question": "How do I force a log rotation on the log servers?", "expected_source": "runbook_disk_full.pdf", "expected_section": "5. Remediation"}
+{"question": "Can I delete old files in /var/log/audit to free up space?", "expected_source": "runbook_disk_full.pdf", "expected_section": "5. Remediation"}
+{"question": "What disk usage should /var/log be back under before the disk-full fix counts as done?", "expected_source": "runbook_disk_full.pdf", "expected_section": "5. Remediation"}
+{"question": "When should a disk-full incident be escalated to the Platform Ops lead?", "expected_source": "runbook_disk_full.pdf", "expected_section": "6. Escalation"}
+{"question": "How do I confirm a disk space incident on the log servers is resolved?", "expected_source": "runbook_disk_full.pdf", "expected_section": "7. Verification"}
+{"question": "What p99 latency triggers the ApiLatencyP99High alert, and for how long?", "expected_source": "runbook_high_latency.txt", "expected_section": "1. SYMPTOMS"}
+{"question": "What is the p99 latency target and timeout for GET /v2/search?", "expected_source": "runbook_high_latency.txt", "expected_section": "2. LATENCY TARGETS"}
+{"question": "How do I tell whether a single public-api pod is slow, and what do I do about it?", "expected_source": "runbook_high_latency.txt", "expected_section": "3.1 Is it one pod or all of them?"}
+{"question": "Which downstream dependencies should I check first when the public API is slow?", "expected_source": "runbook_high_latency.txt", "expected_section": "3.2 Is a dependency slow?"}
+{"question": "Below what redis hit ratio should I suspect a cold cache?", "expected_source": "runbook_high_latency.txt", "expected_section": "3.2 Is a dependency slow?"}
+{"question": "API latency spiked right after a deploy. How do I roll back public-api?", "expected_source": "runbook_high_latency.txt", "expected_section": "4. REMEDIATION"}
+{"question": "Can I raise the public-api HPA maxReplicas above 20 to absorb the load?", "expected_source": "runbook_high_latency.txt", "expected_section": "4. REMEDIATION"}
