@@ -8,11 +8,16 @@ from siteops_rag.embedder.openai_compat import OpenAICompatEmbedder
 
 DIM = 4
 
+
 def make_embedder(handler, **kwargs) -> OpenAICompatEmbedder:
     """Embedder whose HTTP calls go to `handler` instead of the network."""
     return OpenAICompatEmbedder(
-        base_url="http://test/v1", model_name="m", dimension=DIM, api_key="k",
-        transport=httpx.MockTransport(handler), **kwargs,
+        base_url="http://test/v1",
+        embedding_model="m",
+        dimension=DIM,
+        api_key="k",
+        transport=httpx.MockTransport(handler),
+        **kwargs,
     )
 
 
@@ -25,9 +30,9 @@ def test_sends_openai_request_and_returns_vectors_in_input_order():
         data = [{"index": i, "embedding": [float(i)] * DIM} for i in range(len(texts))]
         return httpx.Response(200, json={"data": data[::-1]})  # shuffled: the adapter must sort by index
 
-    vectors = make_embedder(handler, batch_size=2).embed_batch(["a", "b", "c"])
+    embeddings = make_embedder(handler, batch_size=2).embed_batch(["a", "b", "c"])
 
-    assert [v[0] for v in vectors] == [0.0, 1.0, 0.0]  # 2 batches: [a, b] then [c]
+    assert [v[0] for v in embeddings.vectors] == [0.0, 1.0, 0.0]  # 2 batches: [a, b] then [c]
     assert [json.loads(r.content) for r in requests] == [
         {"model": "m", "input": ["a", "b"]},
         {"model": "m", "input": ["c"]},

@@ -48,7 +48,8 @@ rag_project/
 │   └── tests/                  rag only; under unit/ and integration/, subfolders mirror src/
 │       ├── conftest.py             fixtures_dir fixture (shared)
 │       ├── unit/                   fast tier, no optional extras
-│       │   └── converter/test_text.py
+│       │   ├── converter/test_text.py
+│       │   └── vector_store/test_base.py   contract suite: memory (fast) + qdrant (`integration`)
 │       ├── integration/            marked `integration`; run with `pytest -m integration`
 │       │   ├── conftest.py         docling_converter fixture (session; Docling required, imported lazily)
 │       │   └── converter/test_docling.py

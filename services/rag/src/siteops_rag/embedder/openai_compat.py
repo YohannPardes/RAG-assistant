@@ -7,22 +7,25 @@ from siteops_rag.embedder.base import Embedder, EmbeddingError, Vector
 
 logger = logging.getLogger(__name__)
 
+
 class OpenAICompatEmbedder(Embedder):
     """Wraps an Embedder to provide an OpenAI-compatible interface."""
 
-    def __init__(self, base_url: str, 
-                 model_name: str, 
-                 timeout: float = 30.0, 
-                 batch_size: int = 32,
-                 dimension: int = 1024,
-                 max_retries: int = 3,
-                 transport: httpx.HTTPTransport | None = None,
-                 api_key: str = "EMPTY"):
-        
-        super().__init__(dimension = dimension, batch_size=batch_size)
-        
+    def __init__(
+        self,
+        base_url: str,
+        embedding_model: str,
+        timeout: float = 30.0,
+        batch_size: int = 32,
+        dimension: int = 1024,
+        max_retries: int = 3,
+        transport: httpx.HTTPTransport | None = None,
+        api_key: str = "EMPTY",
+    ):
+
+        super().__init__(dimension=dimension, batch_size=batch_size, embedding_model=embedding_model)
+
         self.base_url = base_url
-        self.model_name = model_name
         self.timeout = timeout
 
         self._client = httpx.Client(
@@ -48,8 +51,8 @@ class OpenAICompatEmbedder(Embedder):
             raise EmbeddingError(f"malformed embedding response: {exc}") from exc
 
     def _call_client(self, texts: list[str], **kwargs: Any) -> httpx.Response:
-        kwargs.setdefault("model", self.model_name)
+        kwargs.setdefault("model", self.embedding_model)
         kwargs.setdefault("input", texts)
-        
+
         response = self._client.post("/embeddings", json=kwargs)
         return response

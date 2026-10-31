@@ -1,10 +1,17 @@
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
 Vector = list[float]
+
+
+@dataclass(frozen=True)
+class Embeddings:
+    vectors: list[Vector]
+    model: str  # the embedder's own model name
 
 
 class EmbeddingError(Exception):
@@ -19,20 +26,21 @@ class Embedder(ABC):
     input validation, batching, and the "one vector per text, right size" check.
     """
 
-    def __init__(self, dimension: int, batch_size: int = 32) -> None:
+    def __init__(self, dimension: int, batch_size: int = 32, embedding_model: str = "") -> None:
         if dimension <= 0 or batch_size <= 0:
             raise ValueError("dimension and batch_size must be positive")
         self.dimension = dimension
         self.batch_size = batch_size
+        self.embedding_model = embedding_model
 
     def embed(self, text: str) -> Vector:
         """Embed one text, e.g. a user query."""
-        return self.embed_batch([text])[0]
+        return self.embed_batch([text]).vectors[0]
 
-    def embed_batch(self, texts: Sequence[str]) -> list[Vector]:
+    def embed_batch(self, texts: Sequence[str]) -> Embeddings:
         """Embed many texts, returned in the same order. Splits into backend calls of `batch_size`."""
         if not texts:
-            return []
+            return Embeddings(vectors=[], model=self.embedding_model)
         if any(not t.strip() for t in texts):
             raise ValueError("cannot embed empty or whitespace-only text")  # caller bug, not a backend failure
 
@@ -42,7 +50,7 @@ class Embedder(ABC):
             result = self._embed_batch(batch)
             self._check(batch, result)
             vectors.extend(result)
-        return vectors
+        return Embeddings(vectors=vectors, model=self.embedding_model)
 
     def _check(self, batch: list[str], result: list[Vector]) -> None:
         if len(result) != len(batch):
