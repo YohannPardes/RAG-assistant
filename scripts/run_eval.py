@@ -1,10 +1,12 @@
 """Retrieval eval over the golden set (scope/4): recall@k and MRR of search, printed as JSON.
 
+Every run is also appended as one line to data/eval_history.jsonl, so runs and their configs can be compared.
 Searches the configured collection as it is: run scripts/ingest.py first.
-Usage: uv run python scripts/run_eval.py [--top-k 5] [--golden-set data/golden_set.jsonl]
+Usage: uv run python scripts/run_eval.py [--top-k 5] [--golden-set data/golden_set.jsonl] [--history PATH | --no-history]
 """
 
 import argparse
+import hashlib
 import json
 import subprocess
 import sys
@@ -19,6 +21,7 @@ from siteops_rag.vector_store.base import ScoredChunk
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 NO_SECTION = "(no section)"
+HISTORY = REPO_ROOT / "data" / "eval_history.jsonl"
 
 
 def load_golden_set(path: Path) -> list[dict[str, str]]:
@@ -70,16 +73,32 @@ def _git(*args: str) -> str:
 def git_commit() -> str:
     """Short HEAD hash, with "-dirty" when the tree has uncommitted changes: the numbers may then not be HEAD's."""
     try:
-        commit, dirty = _git("rev-parse", "--short", "HEAD"), _git("status", "--porcelain")
+        # the history file is left out: appending to it must not mark the next run as dirty
+        commit = _git("rev-parse", "--short", "HEAD")
+        dirty = _git("status", "--porcelain", "--", ".", f":!{HISTORY.relative_to(REPO_ROOT).as_posix()}")
     except (OSError, subprocess.CalledProcessError):
         return "unknown"
     return f"{commit}-dirty" if dirty else commit
+
+
+def file_hash(path: Path) -> str:
+    """Short sha256 of a file: two runs with the same hash scored the same questions."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()[:12]
+
+
+def append_history(path: Path, report: dict[str, Any]) -> None:
+    """One JSON line per run, oldest first; the file is only ever appended to."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as history:
+        history.write(json.dumps(report, ensure_ascii=False) + "\n")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--top-k", type=int, default=5)  # same default as /search (rag/7)
     parser.add_argument("--golden-set", type=Path, default=REPO_ROOT / "data" / "golden_set.jsonl")
+    parser.add_argument("--history", type=Path, default=HISTORY)
+    parser.add_argument("--no-history", action="store_true", help="print the report without recording the run")
     args = parser.parse_args()
 
     rows = load_golden_set(args.golden_set)
@@ -95,13 +114,21 @@ def main() -> None:
         "git_commit": git_commit(),
         "config": {
             "embedding_model": settings.embedding.model,
+            "embedding_dimension": settings.embedding.dimension,
             "chunk_max_length": settings.chunking.max_length,
+            "vector_store": settings.vector_store.backend,
+            "collection": settings.vector_store.collection,
             "top_k": args.top_k,
             "reranker": "none",  # no reranker stage yet (rag/8): read it from the settings once there is one
+            "golden_set": args.golden_set.name,
+            "golden_set_sha256": file_hash(args.golden_set),
         },
         "metrics": metrics,
         "misses": misses,
     }
+    if not args.no_history:
+        append_history(args.history, report)
+
     # a redirected stdout would use the locale's encoding (cp1252 on Windows): keep the report UTF-8 JSON
     sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
     print(json.dumps(report, indent=2, ensure_ascii=False))
