@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 from typing import Literal
 
@@ -13,6 +14,16 @@ class Element:
     level: int | None = None  # headings only: 0 = document title, 1 = top section, ...
     rows: TableRows | None = None
     language: str | None = None  # code only: fence language, e.g. "bash" (None when unknown)
+
+
+# A section number at the start of a heading ("4." or "4.1"), then its title.
+_SECTION_NUMBER = re.compile(r"(\d+(?:\.\d+)*)\.?\s+\S")
+
+
+def numbering_level(text: str) -> int | None:
+    """Heading level from its section number: "4. Diagnosis" -> 1, "4.1 Find what..." -> 2; None without one."""
+    match = _SECTION_NUMBER.match(text)
+    return match.group(1).count(".") + 1 if match else None
 
 
 def render_table(rows: TableRows, caption: str = "") -> str:

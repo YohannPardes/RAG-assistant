@@ -10,6 +10,7 @@ Site Ops Assistant: RAG over runbooks (`/ask`) + log-triage agent that opens tic
    - **Proposed** and **Open** entries are not settled. Don't silently pick an answer: say which entry your work depends on and ask, or add/update the entry as **Proposed** with your recommendation.
    - When a new decision is made, record it in `docs/DECISIONS.md` (next free number in its subject, at the end of that section; update the index tables). Never renumber existing IDs.
 3. **Keep the file structure below correct.** Whenever you add, move, rename or delete a file or folder, update the tree in this file in the same change. If the tree and the disk disagree, flag it.
+4. **No AI attribution in git.** Never add `Co-Authored-By` trailers, "Generated with" lines or any other AI attribution to commit messages or PR descriptions, including in commands you write for the user.
 
 ## File structure
 
@@ -96,5 +97,5 @@ rag_project/
 │   ├── e2e/                    agent → rag → tickets for real
 │   └── eval/                   recall@5, triage precision/recall
 ├── scripts/                    ingest.py, generate_logs.py, run_eval.py
-└── data/                       runbooks/ (copies of services/rag/tests/fixtures/, read by scripts/ingest.py), logs/, golden_set.jsonl
+└── data/                       runbooks/ (copies of services/rag/tests/fixtures/, read by scripts/ingest.py), logs/, golden_set.jsonl, eval_history.jsonl (one line per scripts/run_eval.py run)
 ```

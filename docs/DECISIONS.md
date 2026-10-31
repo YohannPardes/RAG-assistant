@@ -250,6 +250,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 
 - Score threshold on retrieved chunks, LLM judgment, or both.
 - **Recommendation (implemented in `rag.py`):** LLM judgment, checked. Nothing retrieved → "I don't know" without calling the LLM; otherwise the answer counts only if at least one of its citations passes rag/10's check. `AskResponse.answered` carries the result.
+- **False premise (implemented in `SYSTEM_PROMPT`):** when the excerpts contradict what the question assumes ("since it's fine to delete /var/log/audit…"), the model answers with the correction instead of "I don't know". It goes through the same citation check, so it can't be invented.
 - **Why:** no score threshold until scope/5's eval gives numbers to set one from; the citation check stops an answer the excerpts don't support.
 - **Cost:** a correct answer with a badly copied quote is reported as "I don't know".
 

@@ -20,9 +20,6 @@ GOLDEN_SET = [
     if line.strip()
 ]
 
-# strict: once the text converter emits headings these pass, and the marker must go
-NO_TXT_HEADINGS = pytest.mark.xfail(strict=True, reason="TextMarkdownConverter emits no headings: .txt chunks have none")
-
 
 @pytest.fixture(scope="module")
 def sections(docling_converter, ingest_script: ModuleType, configured: Settings) -> set[tuple[str, str]]:
@@ -39,11 +36,7 @@ def sections(docling_converter, ingest_script: ModuleType, configured: Settings)
 
 @pytest.mark.parametrize(
     "row",
-    [
-        pytest.param(row, id=f"{i}-{row['expected_source']}",
-                     marks=NO_TXT_HEADINGS if row["expected_source"].endswith(".txt") else ())
-        for i, row in enumerate(GOLDEN_SET)
-    ],
+    [pytest.param(row, id=f"{i}-{row['expected_source']}") for i, row in enumerate(GOLDEN_SET)],
 )
 def test_expected_section_is_a_chunk_section(row, sections) -> None:
     assert (row["expected_source"], row["expected_section"]) in sections
