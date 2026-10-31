@@ -3,6 +3,7 @@ import re
 from siteops_rag.converter.base import (
     AbstractDocumentConverter,
     ConversionError,
+    RawDocument,
     UnsupportedMediaType,
 )
 from siteops_rag.models import Element
@@ -14,7 +15,10 @@ _BLANK_LINES = re.compile(r"\n\s*\n")
 class TextMarkdownConverter(AbstractDocumentConverter):
     """Plain text -> one paragraph Element per blank-line-separated block. No Docling."""
 
-    def convert_to_elements(self, data: bytes, media_type: str) -> list[Element]:
+    def convert_to_elements(self, raw_document: RawDocument) -> list[Element]:
+        media_type = raw_document.media_type
+        data = raw_document.data
+
         if media_type != "text/plain":
             raise UnsupportedMediaType(media_type)
 

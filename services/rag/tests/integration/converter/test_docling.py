@@ -1,5 +1,6 @@
 import pytest
 
+from siteops_rag.converter.base import RawDocument
 from siteops_rag.models import Element
 
 pytestmark = pytest.mark.integration
@@ -7,7 +8,7 @@ pytestmark = pytest.mark.integration
 # helpers 
 def _convert(converter, fixtures_dir, filename, media_type) -> list[Element]:
     data = (fixtures_dir / filename).read_bytes()
-    return converter.convert_to_elements(data, media_type=media_type)
+    return converter.convert_to_elements(RawDocument(filename, data, media_type))
 
 def _all_text(elements: list[Element]) -> str:
     return "\n".join(e.text for e in elements)
@@ -18,7 +19,7 @@ def test_converting_empty_doc(docling_converter) -> None:
     document = ""
 
     encoded_document = document.encode("utf-8")
-    out = docling_converter.convert_to_elements(encoded_document, media_type="text/plain")
+    out = docling_converter.convert_to_elements(RawDocument("empty.txt", encoded_document, "text/plain"))
 
     assert out == []
 
@@ -49,7 +50,7 @@ def test_converting_without_errors(filename, media_type, expected_text,
 
     data = (fixtures_dir / filename).read_bytes()
 
-    out = docling_converter.convert_to_elements(data, media_type=media_type)
+    out = docling_converter.convert_to_elements(RawDocument(filename, data, media_type))
 
     assert expected_text in _all_text(out)
 
@@ -79,7 +80,7 @@ def test_page_breaks_in_converted_markdown(filename, media_type,
 
     data = (fixtures_dir / filename).read_bytes()
 
-    out = docling_converter.convert_to_elements(data, media_type=media_type)
+    out = docling_converter.convert_to_elements(RawDocument(filename, data, media_type))
 
     pages = {e.page for e in out}
     assert pages == out_pages
@@ -122,7 +123,7 @@ def test_tables_are_parsed(filename, media_type, expected_header,
 
     data = (fixtures_dir / filename).read_bytes()
 
-    out = docling_converter.convert_to_elements(data, media_type=media_type)
+    out = docling_converter.convert_to_elements(RawDocument(filename, data, media_type))
 
     out = _all_text(out)
 
@@ -153,7 +154,7 @@ def test_commands_are_not_html_escaped(filename, media_type,
 
     data = (fixtures_dir / filename).read_bytes()
 
-    out = docling_converter.convert_to_elements(data, media_type=media_type)
+    out = docling_converter.convert_to_elements(RawDocument(filename, data, media_type))
     out = _all_text(out)
 
     assert expected_command in out
