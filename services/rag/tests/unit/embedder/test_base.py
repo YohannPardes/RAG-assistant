@@ -18,11 +18,11 @@ class _StubEmbedder(Embedder):
 def test_splits_into_backend_calls_of_batch_size():
     embedder = FakeEmbedder(dimension=8, batch_size=2)
 
-    vectors = embedder.embed_batch(["a", "b", "c", "d", "e"])
+    embeddings = embedder.embed_batch(["a", "b", "c", "d", "e"])
 
     assert embedder.calls == [["a", "b"], ["c", "d"], ["e"]]
-    assert len(vectors) == 5
-    assert embedder.embed_batch([]) == []
+    assert len(embeddings.vectors) == 5
+    assert embedder.embed_batch([]).vectors == []
     assert len(embedder.calls) == 3  # the empty batch made no backend call
 
 
@@ -49,9 +49,7 @@ def test_wrong_backend_output_raises_embedding_error(answer):
         _StubEmbedder(answer).embed("disk full")
 
 
-@pytest.mark.parametrize("kwargs", [{"dimension": 0}, 
-                                    {"batch_size": 0}], 
-                         ids=["dimension", "batch-size"])
+@pytest.mark.parametrize("kwargs", [{"dimension": 0}, {"batch_size": 0}], ids=["dimension", "batch-size"])
 def test_non_positive_settings_are_rejected(kwargs):
     with pytest.raises(ValueError):
         FakeEmbedder(**kwargs)
