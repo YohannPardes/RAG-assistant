@@ -16,6 +16,9 @@ docling = [
 openai-compat = [
     "httpx>=0.28.1",
 ]
+qdrant = [
+    "qdrant-client>=1.20.0",
+]
 
 [tool.uv.sources]                                # where uv gets dependencies from, instead of PyPI
 siteops-common = { workspace = true }            # use the workspace member in packages/common
