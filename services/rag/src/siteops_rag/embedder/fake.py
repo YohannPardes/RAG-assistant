@@ -6,8 +6,8 @@ from siteops_rag.embedder.base import Embedder, Vector
 class FakeEmbedder(Embedder):
     """Deterministic, offline embedder for tests: texts sharing words get similar vectors."""
 
-    def __init__(self, dimension: int = 64, batch_size: int = 32) -> None:
-        super().__init__(dimension=dimension, batch_size=batch_size)
+    def __init__(self, dimension: int = 64, batch_size: int = 32, embedding_model: str = "fake") -> None:
+        super().__init__(dimension=dimension, batch_size=batch_size, embedding_model=embedding_model)
         self.calls: list[list[str]] = []  # what each backend call received, for assertions
 
     def _embed_batch(self, texts: list[str]) -> list[Vector]:

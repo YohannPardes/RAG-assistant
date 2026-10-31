@@ -1,5 +1,4 @@
 import logging
-from typing import Any
 
 import httpx
 
@@ -9,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 class OpenAICompatEmbedder(Embedder):
-    """Wraps an Embedder to provide an OpenAI-compatible interface."""
+    """Calls an OpenAI-compatible `/embeddings` endpoint (TEI, vLLM, Ollama...)."""
 
     def __init__(
         self,
@@ -19,14 +18,11 @@ class OpenAICompatEmbedder(Embedder):
         batch_size: int = 32,
         dimension: int = 1024,
         max_retries: int = 3,
-        transport: httpx.HTTPTransport | None = None,
+        transport: httpx.BaseTransport | None = None,
         api_key: str = "EMPTY",
     ):
 
         super().__init__(dimension=dimension, batch_size=batch_size, embedding_model=embedding_model)
-
-        self.base_url = base_url
-        self.timeout = timeout
 
         self._client = httpx.Client(
             base_url=base_url,
@@ -41,7 +37,7 @@ class OpenAICompatEmbedder(Embedder):
 
     def _embed_batch(self, texts: list[str]) -> list[Vector]:
         try:
-            response = self._call_client(texts)
+            response = self._client.post("/embeddings", json={"model": self.embedding_model, "input": texts})
             response.raise_for_status()
             data = response.json()["data"]
             return [item["embedding"] for item in sorted(data, key=lambda d: d["index"])]
@@ -49,10 +45,3 @@ class OpenAICompatEmbedder(Embedder):
             raise EmbeddingError(f"embedding request failed: {exc}") from exc
         except (KeyError, TypeError, ValueError) as exc:  # body is not the expected JSON shape
             raise EmbeddingError(f"malformed embedding response: {exc}") from exc
-
-    def _call_client(self, texts: list[str], **kwargs: Any) -> httpx.Response:
-        kwargs.setdefault("model", self.embedding_model)
-        kwargs.setdefault("input", texts)
-
-        response = self._client.post("/embeddings", json=kwargs)
-        return response
