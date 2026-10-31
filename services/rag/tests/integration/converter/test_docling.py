@@ -170,10 +170,6 @@ def test_headings_carry_their_level(docling_converter, fixtures_dir) -> None:
     assert elements[0].text == "RB-310: TLS Certificate Expiry"
     assert levels["3.1 Check the certificate status"] > levels["3. Diagnosis"]
 
-# strict: once fixed these pass, and the marker must go so they guard against a regression
-PDF_FLAT_HEADINGS = pytest.mark.xfail(strict=True, reason="Docling gives every PDF heading level 1, title included")
-PDF_MERGED_LINES = pytest.mark.xfail(strict=True, reason="Docling's PDF layout joins the lines of one block")
-
 
 @pytest.mark.parametrize(
     ("filename", "media_type", "title", "section", "subsection"),
@@ -186,12 +182,10 @@ PDF_MERGED_LINES = pytest.mark.xfail(strict=True, reason="Docling's PDF layout j
          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
          "RB-204: PostgreSQL Primary Failover", "4. Failover procedure", "4.1 Promote the replica"
          ),
-        pytest.param(
-            "runbook_disk_full.pdf",
-            "application/pdf",
-            "RB-101: Disk Space Exhaustion on Log Servers", "4. Diagnosis", "4.1 Find what is using the space",
-            marks=PDF_FLAT_HEADINGS,
-        ),
+        ("runbook_disk_full.pdf",
+         "application/pdf",
+         "RB-101: Disk Space Exhaustion on Log Servers", "4. Diagnosis", "4.1 Find what is using the space"
+         ),
     ],
 )
 def test_heading_levels_nest_like_the_numbering(filename, media_type, title, section, subsection,
@@ -204,7 +198,6 @@ def test_heading_levels_nest_like_the_numbering(filename, media_type, title, sec
     assert levels[title] < levels[section] < levels[subsection]
 
 
-@PDF_MERGED_LINES
 def test_pdf_code_block_keeps_one_command_per_line(docling_converter, fixtures_dir) -> None:
     # joined, the two commands read as one that can't be run: "df -h /var/log sudo du -xh ..."
     elements = _convert(docling_converter, fixtures_dir, "runbook_disk_full.pdf", "application/pdf")
@@ -214,7 +207,6 @@ def test_pdf_code_block_keeps_one_command_per_line(docling_converter, fixtures_d
     assert "df -h /var/log\nsudo du -xh /var/log | sort -rh | head -20" in codes
 
 
-@PDF_MERGED_LINES
 def test_pdf_numbered_steps_are_separate_items(docling_converter, fixtures_dir) -> None:
     elements = _convert(docling_converter, fixtures_dir, "runbook_disk_full.pdf", "application/pdf")
 
