@@ -13,13 +13,34 @@ class ScoredChunk:
 
 
 class VectorStore(ABC):
+    """Subclasses implement `_upsert`; the checks every store must make live in `upsert`, once."""
+
+    def __init__(self, dimension: int, embedding_model: str) -> None:
+        self.dimension = dimension
+        self.embedding_model = embedding_model
+
     @abstractmethod
     def search(self, query: Vector, top_k: int) -> list[ScoredChunk]:
         """Search for the top_k most similar vectors to the query vector."""
 
-    @abstractmethod
     def upsert(self, chunks: list[Chunk], embeddings: Embeddings) -> None:
-        """Upsert the given chunks and their corresponding vectors into the store."""
+        """Upsert the given chunks and their corresponding vectors into the store.
+
+        The chunks are the complete set for their sources: a source's other chunks are deleted (rag/12).
+        """
+        if embeddings.model != self.embedding_model:
+            raise ValueError(f"store holds {self.embedding_model!r} vectors, got {embeddings.model!r}")
+        if len(chunks) != len(embeddings.vectors):
+            raise ValueError(f"got {len(chunks)} chunks but {len(embeddings.vectors)} vectors")
+        if any(len(v) != self.dimension for v in embeddings.vectors):
+            raise ValueError(f"expected dimension {self.dimension}")
+        if not chunks:
+            return  # nothing to write, and no source to clean up
+        self._upsert(chunks, embeddings.vectors)
+
+    @abstractmethod
+    def _upsert(self, chunks: list[Chunk], vectors: list[Vector]) -> None:
+        """Write the points, then delete the stale ones. Inputs are checked and non-empty."""
 
     @abstractmethod
     def delete_by_source(self, source: str) -> int:

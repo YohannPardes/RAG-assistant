@@ -1,12 +1,11 @@
 import logging
 from datetime import UTC, datetime
-from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 from qdrant_client import QdrantClient, models
 
-from siteops_rag.embedder.base import Embeddings, Vector
-from siteops_rag.ingestion.chunking import Chunk
+from siteops_rag.embedder.base import Vector
+from siteops_rag.models import Chunk
 from siteops_rag.vector_store.base import ScoredChunk, VectorStore
 
 logger = logging.getLogger(__name__)
@@ -27,36 +26,33 @@ class ChunkPayload(BaseModel):
 class QdrantVectorStore(VectorStore):
     """A vector store that uses Qdrant as the backend."""
 
-    def __init__(self, client: QdrantClient, collection_name: str, distance_func: Literal["cosine", "euclidean"]) -> None:
+    def __init__(self, client: QdrantClient, collection_name: str, dimension: int, embedding_model: str) -> None:
+        super().__init__(dimension=dimension, embedding_model=embedding_model)
 
         self.client = client
 
-        distance_functions = {
-            "cosine": models.Distance.COSINE,
-            "euclidean": models.Distance.EUCLIDEAN,
-        }
-
-        self.distance_func = distance_functions[distance_func]
+        self.distance_func = models.Distance.COSINE
         self.collection_name = collection_name
-        self.__create_collection(self.collection_name)
+        self._create_collection(self.collection_name)
 
-    def __create_collection(self, collection_name: str) -> None:
+    def _create_collection(self, collection_name: str) -> None:
 
         if not self.client.collection_exists(collection_name):
             self.client.create_collection(
                 collection_name,
-                vectors_config=models.VectorParams(size=1024, distance=models.Distance.COSINE),
+                vectors_config=models.VectorParams(size=self.dimension, distance=self.distance_func),
             )
-            logger.info(f"Collection '{collection_name}' created.")
+            logger.info("Collection '%s' created.", collection_name)
 
         else:
-            logger.info(f"Collection '{collection_name}' already exists. Skipping creation.")
+            # an existing collection must match the configured model, or every upsert fails later
+            params = self.client.get_collection(collection_name).config.params.vectors
+            if not isinstance(params, models.VectorParams) or params.size != self.dimension:
+                raise ValueError(f"collection '{collection_name}' does not hold {self.dimension}-dimension vectors")
+            logger.info("Collection '%s' already exists. Skipping creation.", collection_name)
 
-    def upsert(self, chunks: list[Chunk], embeddings: Embeddings) -> None:
+    def _upsert(self, chunks: list[Chunk], vectors: list[Vector]) -> None:
         """Insert or overwrite points in the collection."""
-
-        assert len(chunks) == len(embeddings), "Chunks and embeddings must have the same length."
-
         now = datetime.now(UTC)
         points = [
             models.PointStruct(
@@ -67,13 +63,22 @@ class QdrantVectorStore(VectorStore):
                     text=chunk.text,
                     heading_path=list(chunk.heading_path),
                     page=chunk.page,
-                    embedding_model=embeddings.embedding_model,
+                    embedding_model=self.embedding_model,
                     ingested_at=now,
                 ).model_dump(mode="json"),
             )
-            for chunk, vector in zip(chunks, embeddings.vectors, strict=True)
+            for chunk, vector in zip(chunks, vectors, strict=True)
         ]
         self.client.upsert(self.collection_name, points=points)
+        self._delete_stale(chunks)
+
+    def _delete_stale(self, chunks: list[Chunk]) -> None:
+        """Delete the chunks of the given chunks' sources that are not among them (rag/12)."""
+        stale_filter = models.Filter(
+            must=[models.FieldCondition(key="source", match=models.MatchAny(any=list({chunk.source for chunk in chunks})))],
+            must_not=[models.HasIdCondition(has_id=[chunk.chunk_id for chunk in chunks])],
+        )
+        self.client.delete(self.collection_name, points_selector=models.FilterSelector(filter=stale_filter))
 
     def delete_by_source(self, source: str) -> int:
         """Delete points from the collection by source."""
@@ -82,12 +87,26 @@ class QdrantVectorStore(VectorStore):
                 models.FieldCondition(key="source", match=models.MatchValue(value=source)),
             ]
         )
-        return self.client.delete(self.collection_name, points_selector=models.FilterSelector(filter=source_filter))
+        # delete does not say how many points it removed: count them first
+        deleted = self.client.count(self.collection_name, count_filter=source_filter, exact=True).count
+        self.client.delete(self.collection_name, points_selector=models.FilterSelector(filter=source_filter))
+        return deleted
 
     def search(self, query: Vector, top_k: int) -> list[ScoredChunk]:
         """Search for the top-k most similar points in the collection."""
         hits = self.client.query_points(self.collection_name, query=query, limit=top_k, with_payload=True).points
-        return [{"id": hit.id, "score": hit.score, "payload": hit.payload} for hit in hits]
+        return [ScoredChunk(chunk=self._to_chunk(hit), score=hit.score) for hit in hits]
+
+    @staticmethod
+    def _to_chunk(hit: models.ScoredPoint) -> Chunk:
+        payload = ChunkPayload.model_validate(hit.payload)
+        return Chunk(
+            chunk_id=str(hit.id),
+            source=payload.source,
+            text=payload.text,
+            heading_path=tuple(payload.heading_path),
+            page=payload.page,
+        )
 
     def count(self) -> int:
         """Count the number of points in the collection.
