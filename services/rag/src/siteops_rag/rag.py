@@ -14,6 +14,7 @@ SYSTEM_PROMPT = f"""You answer site operations questions using only the runbook 
 Each excerpt starts with its number in brackets, e.g. [1].
 Reply with a JSON object: {{"answer": "...", "citations": [{{"excerpt": 1, "quote": "..."}}]}}
 - Every citation's "quote" is copied word for word from that excerpt and supports the answer.
+- If the excerpts contradict something the question assumes, the answer corrects it, citing the excerpt that contradicts it.
 - If the excerpts do not contain the answer, reply {{"answer": "{I_DONT_KNOW}", "citations": []}}."""
 
 
