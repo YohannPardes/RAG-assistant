@@ -13,7 +13,7 @@ chunking:
   max_length: 1000
 
 retrieval:
-  top_k: 5   # chunks retrieved (and given to the LLM) when a request sends no top_k
+  top_k: 10   # chunks retrieved (and given to the LLM) when a request sends no top_k
 
 vector_store:
   url: http://localhost:6333
