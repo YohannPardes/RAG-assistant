@@ -12,6 +12,8 @@ def make_chat_model(handler, **kwargs) -> OpenAICompatChatModel:
     return OpenAICompatChatModel(
         base_url="http://test/v1",
         model="m",
+        timeout=5.0,
+        max_retries=0,
         temperature=0.2,
         api_key="k",
         transport=httpx.MockTransport(handler),

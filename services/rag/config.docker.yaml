@@ -1,0 +1,27 @@
+# the image's config (RAG_CONFIG_FILE in the Dockerfile): config.yaml with the container's view of its neighbours
+embedding:
+  base_url: http://host.docker.internal:11434/v1   # Ollama on the host machine (Linux: extra_hosts host-gateway)
+  model: bge-m3
+  dimension: 1024
+  batch_size: 32
+  timeout: 30.0
+  max_retries: 3
+
+llm:
+  base_url: http://host.docker.internal:11434/v1   # Ollama on the host machine
+  model: qwen3.5:27b
+  reasoning_effort: "none"
+  temperature: 0.0
+  timeout: 120.0
+  max_retries: 2
+
+chunking:
+  max_length: 1000
+
+retrieval:
+  top_k: 10
+
+vector_store:
+  backend: qdrant
+  url: http://qdrant:6333   # the qdrant service on the compose network
+  collection: runbooks

@@ -16,11 +16,21 @@ def settings(monkeypatch, tmp_path) -> Settings:
     monkeypatch.setenv("RAG_CONFIG_FILE", str(tmp_path / "none.yaml"))
     return Settings(
         _env_file=None,
-        embedding=EmbeddingSettings(base_url="http://emb:1/v1", model="emb-model", dimension=8, api_key=SecretStr("emb-key")),
-        llm=LLMSettings(base_url="http://llm:2/v1", model="llm-model", api_key=SecretStr("llm-key"), reasoning_effort="none"),
+        embedding=EmbeddingSettings(
+            base_url="http://emb:1/v1", model="emb-model", dimension=8, api_key=SecretStr("emb-key"), timeout=5.0, max_retries=0, batch_size=4
+        ),
+        llm=LLMSettings(
+            base_url="http://llm:2/v1",
+            model="llm-model",
+            api_key=SecretStr("llm-key"),
+            timeout=6.0,
+            max_retries=1,
+            temperature=0.3,
+            reasoning_effort="none",
+        ),
         chunking=ChunkingSettings(max_length=321),
         retrieval=RetrievalSettings(top_k=7),
-        vector_store=VectorStoreSettings(backend="memory"),
+        vector_store=VectorStoreSettings(backend="memory", url="unused", collection="unused"),
     )
 
 
@@ -31,6 +41,8 @@ def test_rag_is_built_from_the_settings(settings) -> None:
     assert rag.embedder.dimension == 8
     assert rag.chat_model.model == "llm-model"
     assert rag.chat_model.reasoning_effort == "none"
+    assert rag.chat_model.temperature == 0.3
+    assert rag.embedder.batch_size == 4
     assert rag.top_k == 7
     # the store must expect the embedder's vectors, or every upsert fails
     assert isinstance(rag.vector_store, InMemoryVectorStore)

@@ -22,7 +22,7 @@ CHUNK = Chunk(chunk_id="c-disk", source="runbook_disk_full.pdf", text="Disk full
 
 class DownEmbedder(Embedder):
     def __init__(self) -> None:
-        super().__init__(dimension=DIM, embedding_model="fake")
+        super().__init__(dimension=DIM, batch_size=32, embedding_model="fake")
 
     def _embed_batch(self, texts: list[str]) -> list[Vector]:
         raise EmbeddingError("embedding server unreachable")
@@ -40,7 +40,7 @@ def client_for() -> Iterator:
 
     def make(rag: RAG) -> HttpRagClient:
         app.dependency_overrides[get_rag] = lambda: rag
-        return HttpRagClient("http://rag", client=TestClient(app))
+        return HttpRagClient("http://rag", timeout=10.0, retries=2, client=TestClient(app))
 
     yield make
     app.dependency_overrides.clear()

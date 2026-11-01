@@ -19,7 +19,7 @@ class _FailingEmbedder(Embedder):
     """An embedding backend that is down."""
 
     def __init__(self) -> None:
-        super().__init__(dimension=DIM, embedding_model="fake")
+        super().__init__(dimension=DIM, batch_size=32, embedding_model="fake")
 
     def _embed_batch(self, texts: list[str]) -> list[Vector]:
         raise EmbeddingError("embedding server unreachable")

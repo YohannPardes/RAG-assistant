@@ -1,19 +1,21 @@
 """Configuration of the rag service.
 
-Sources, highest priority first:
-  1. environment variables   RAG_EMBEDDING__MODEL=...   (compose, CI, one-off overrides)
-  2. .env file               services/rag/.env           (secrets on a dev machine; never committed)
-  3. YAML file               services/rag/config.yaml    (committed; path overridable with RAG_CONFIG_FILE)
-  4. the defaults below
+Two sources, which never hold the same key (design/4):
+  - YAML file         services/rag/config.yaml (committed; another file with RAG_CONFIG_FILE): every setting but secrets
+  - env vars, .env    RAG_LLM__API_KEY=... (.env: services/rag/.env, never committed; env vars win): secrets only
+
+A secret in the YAML, or another setting in env vars or .env, is an error. So is a setting missing from the YAML:
+the only code defaults are the API keys (local model servers ignore them) and retrieval.top_k (rag/7).
 
 Only the composition root (container.py) reads Settings; adapters receive plain values.
 """
 
 import os
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
+from pydantic.fields import FieldInfo
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -25,8 +27,44 @@ from pydantic_settings import (
 _SERVICE_DIR = Path(__file__).resolve().parents[2]
 
 
+SECRETS = {"embedding.api_key", "llm.api_key"}  # the only settings read from env vars and .env
+
+
 def _config_file() -> Path:
     return Path(os.environ.get("RAG_CONFIG_FILE", _SERVICE_DIR / "config.yaml"))
+
+
+def _keys(data: dict[str, Any], prefix: str = "") -> set[str]:
+    """Dotted names of the values a source gives: {"llm": {"model": ...}} → {"llm.model"}."""
+    keys = set()
+    for key, value in data.items():
+        keys |= _keys(value, f"{prefix}{key}.") if isinstance(value, dict) else {f"{prefix}{key}"}
+    return keys
+
+
+class _SecretsOnly(PydanticBaseSettingsSource):
+    """Env vars or .env, which may only hold secrets."""
+
+    def __init__(self, source: PydanticBaseSettingsSource) -> None:
+        super().__init__(source.settings_cls)
+        self._source = source
+
+    def get_field_value(self, field: FieldInfo, field_name: str) -> tuple[Any, str, bool]:  # abstract; __call__ doesn't use it
+        raise NotImplementedError
+
+    def __call__(self) -> dict[str, Any]:
+        data = self._source()
+        if others := sorted(_keys(data) - SECRETS):
+            raise ValueError(f"only secrets come from env vars and .env: set {others} in {_config_file()}")
+        return data
+
+
+class _YamlWithoutSecrets(YamlConfigSettingsSource):
+    def __call__(self) -> dict[str, Any]:
+        data = super().__call__()
+        if secrets := sorted(_keys(data) & SECRETS):
+            raise ValueError(f"{secrets} are secrets: set them in .env or env vars, not in {_config_file()}")
+        return data
 
 
 class _Section(BaseModel):
@@ -36,28 +74,28 @@ class _Section(BaseModel):
 
 
 class EmbeddingSettings(_Section):
-    base_url: str = "http://localhost:8001/v1"
-    model: str = "BAAI/bge-m3"
-    dimension: int = Field(default=1024, gt=0)
+    base_url: str
+    model: str = Field(min_length=1)
+    dimension: int = Field(gt=0)
     api_key: SecretStr = SecretStr("EMPTY")  # vLLM / Ollama ignore it; the OpenAI SDK requires a value
-    timeout: float = Field(default=30.0, gt=0)
-    max_retries: int = Field(default=3, ge=0)
-    batch_size: int = Field(default=32, gt=0)
+    timeout: float = Field(gt=0)
+    max_retries: int = Field(ge=0)
+    batch_size: int = Field(gt=0)
 
 
 class LLMSettings(_Section):
-    base_url: str = "http://localhost:8000/v1"
-    model: str = ""  # required in practice: set it in config.yaml
+    base_url: str
+    model: str = Field(min_length=1)
     api_key: SecretStr = SecretStr("EMPTY")
-    timeout: float = Field(default=120.0, gt=0)
-    max_retries: int = Field(default=2, ge=0)
-    temperature: float = Field(default=0.0, ge=0)
-    # thinking models: "none" turns thinking off (Ollama); None = don't send it, the server's default applies
-    reasoning_effort: Literal["none", "low", "medium", "high"] | None = None
+    timeout: float = Field(gt=0)
+    max_retries: int = Field(ge=0)
+    temperature: float = Field(ge=0)
+    # thinking models: "none" turns thinking off (Ollama); None (null) = don't send it, the server's default applies
+    reasoning_effort: Literal["none", "low", "medium", "high"] | None
 
 
 class ChunkingSettings(_Section):
-    max_length: int = Field(default=1000, gt=0)
+    max_length: int = Field(gt=0)
 
 
 class RetrievalSettings(_Section):
@@ -65,9 +103,9 @@ class RetrievalSettings(_Section):
 
 
 class VectorStoreSettings(_Section):
-    backend: Literal["memory", "qdrant"] = "qdrant"  # in_memory or qdrant 
-    url: str = "http://localhost:6333"
-    collection: str = "runbooks"
+    backend: Literal["memory", "qdrant"]
+    url: str
+    collection: str = Field(min_length=1)
 
 
 class Settings(BaseSettings):
@@ -78,11 +116,11 @@ class Settings(BaseSettings):
         extra="ignore",  # a shared .env may hold other keys (HF_TOKEN...); sections still forbid typos
     )
 
-    embedding: EmbeddingSettings = Field(default_factory=EmbeddingSettings)
-    llm: LLMSettings = Field(default_factory=LLMSettings)
-    chunking: ChunkingSettings = Field(default_factory=ChunkingSettings)
+    embedding: EmbeddingSettings
+    llm: LLMSettings
+    chunking: ChunkingSettings
     retrieval: RetrievalSettings = Field(default_factory=RetrievalSettings)
-    vector_store: VectorStoreSettings = Field(default_factory=VectorStoreSettings)
+    vector_store: VectorStoreSettings
 
     @classmethod
     def settings_customise_sources(
@@ -94,5 +132,5 @@ class Settings(BaseSettings):
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
         # Earlier sources win: constructor args > env vars > .env > YAML > defaults.
-        yaml = YamlConfigSettingsSource(settings_cls, yaml_file=_config_file())
-        return (init_settings, env_settings, dotenv_settings, yaml, file_secret_settings)
+        yaml = _YamlWithoutSecrets(settings_cls, yaml_file=_config_file())
+        return (init_settings, _SecretsOnly(env_settings), _SecretsOnly(dotenv_settings), yaml)

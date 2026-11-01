@@ -21,7 +21,12 @@ EXCERPT = ScoredChunk(
 def make(settings: LLMSettings, **overrides: object) -> OpenAICompatChatModel:
     s = settings.model_copy(update=overrides)
     return OpenAICompatChatModel(
-        base_url=s.base_url, model=s.model, timeout=s.timeout, temperature=s.temperature, reasoning_effort=s.reasoning_effort
+        base_url=s.base_url,
+        model=s.model,
+        timeout=s.timeout,
+        max_retries=s.max_retries,
+        temperature=s.temperature,
+        reasoning_effort=s.reasoning_effort,
     )
 
 

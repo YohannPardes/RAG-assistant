@@ -1,0 +1,9 @@
+rag:
+  base_url: http://localhost:8000   # the rag service (its /search)
+  timeout: 10.0   # seconds per request
+  retries: 2      # connection failures only; safe, /search is read-only (arch/7)
+
+tickets:
+  url: http://localhost:8002/mcp    # the tickets service's MCP endpoint, as docker-compose publishes it
+  timeout: 10.0   # seconds per call
+  retries: 2      # connection failures only; safe, the service deduplicates a repeated create (agent/3)

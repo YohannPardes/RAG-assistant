@@ -1,0 +1,5 @@
+db_path: tickets.db     # the SQLite file, relative to the working directory
+db_lock_timeout: 10.0   # seconds a write waits while another one holds the database lock
+dedup_minutes: 60       # agent/3's dedup window
+host: 127.0.0.1         # bind address; 127.0.0.1 also turns on the SDK's localhost-only Host check
+port: 8000

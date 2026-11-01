@@ -3458,6 +3458,7 @@ dependencies = [
     { name = "langchain-core" },
     { name = "langgraph" },
     { name = "pydantic" },
+    { name = "pydantic-settings", extra = ["yaml"] },
     { name = "siteops-common" },
 ]
 
@@ -3480,6 +3481,7 @@ requires-dist = [
     { name = "langgraph", specifier = ">=1.2.19" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=2.3.0" },
     { name = "pydantic", specifier = ">=2" },
+    { name = "pydantic-settings", extras = ["yaml"], specifier = ">=2.16.1" },
     { name = "siteops-common", editable = "packages/common" },
 ]
 provides-extras = ["openai-compat", "mcp", "http"]
@@ -3538,7 +3540,7 @@ source = { editable = "services/tickets" }
 dependencies = [
     { name = "mcp" },
     { name = "pydantic" },
-    { name = "pydantic-settings" },
+    { name = "pydantic-settings", extra = ["yaml"] },
     { name = "siteops-common" },
     { name = "uvicorn" },
 ]
@@ -3547,7 +3549,7 @@ dependencies = [
 requires-dist = [
     { name = "mcp", specifier = ">=2.3.0" },
     { name = "pydantic", specifier = ">=2" },
-    { name = "pydantic-settings", specifier = ">=2.16.1" },
+    { name = "pydantic-settings", extras = ["yaml"], specifier = ">=2.16.1" },
     { name = "siteops-common", editable = "packages/common" },
     { name = "uvicorn", specifier = ">=0.54.0" },
 ]

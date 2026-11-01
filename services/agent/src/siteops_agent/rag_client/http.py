@@ -8,7 +8,7 @@ from siteops_common.contracts import SearchRequest, SearchResponse
 class HttpRagClient(RagClient):
     """rag's POST /search over HTTP. Connection errors are retried (arch/7): /search is read-only, so it is safe."""
 
-    def __init__(self, base_url: str, timeout: float = 10.0, retries: int = 2, client: httpx.Client | None = None) -> None:
+    def __init__(self, base_url: str, timeout: float, retries: int, client: httpx.Client | None = None) -> None:
         # `client`: tests pass one bound to an in-process app (Starlette's TestClient) or to a mock transport
         self._client = client or httpx.Client(base_url=base_url, timeout=timeout)
         self.retries = retries

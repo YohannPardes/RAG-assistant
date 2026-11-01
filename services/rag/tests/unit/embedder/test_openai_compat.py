@@ -9,15 +9,17 @@ from siteops_rag.embedder.openai_compat import OpenAICompatEmbedder
 DIM = 4
 
 
-def make_embedder(handler, **kwargs) -> OpenAICompatEmbedder:
+def make_embedder(handler, batch_size: int = 32) -> OpenAICompatEmbedder:
     """Embedder whose HTTP calls go to `handler` instead of the network."""
     return OpenAICompatEmbedder(
         base_url="http://test/v1",
         embedding_model="m",
+        timeout=5.0,
+        batch_size=batch_size,
         dimension=DIM,
+        max_retries=0,
         api_key="k",
         transport=httpx.MockTransport(handler),
-        **kwargs,
     )
 
 

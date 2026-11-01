@@ -39,7 +39,7 @@ def sink(request: pytest.FixtureRequest) -> tuple[TicketSink, Advance]:
         memory = MemoryTicketSink(now=lambda: clock[0])
         return memory, lambda delta: clock.__setitem__(0, clock[0] + delta)
     backend = request.getfixturevalue("backend")
-    return McpTicketSink(request.getfixturevalue("mcp_url"), API_KEY), backend.advance
+    return McpTicketSink(request.getfixturevalue("mcp_url"), API_KEY, timeout=10.0, retries=2), backend.advance
 
 
 def test_a_new_fault_gives_a_new_ticket(sink) -> None:

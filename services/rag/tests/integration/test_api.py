@@ -1,9 +1,10 @@
-"""The API as it starts for real: the lifespan builds every adapter from config (env vars on top of config.yaml),
+"""The API as it starts for real: the lifespan builds every adapter from a config file,
 over the ingested sample runbooks, the local Ollama models and a real Qdrant."""
 
 from collections.abc import Iterator
 
 import pytest
+import yaml
 from fastapi.testclient import TestClient
 
 from siteops_common.contracts import AskResponse, SearchResponse
@@ -13,13 +14,12 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.fixture
-def client(ingested: Settings, monkeypatch) -> Iterator[TestClient]:
-    # how docker-compose will point the service at its neighbours
-    monkeypatch.setenv("RAG_EMBEDDING__BASE_URL", ingested.embedding.base_url)
-    monkeypatch.setenv("RAG_LLM__BASE_URL", ingested.llm.base_url)
-    monkeypatch.setenv("RAG_LLM__TIMEOUT", str(ingested.llm.timeout))
-    monkeypatch.setenv("RAG_VECTOR_STORE__URL", ingested.vector_store.url)
-    monkeypatch.setenv("RAG_VECTOR_STORE__COLLECTION", ingested.vector_store.collection)
+def client(ingested: Settings, monkeypatch, tmp_path) -> Iterator[TestClient]:
+    # how a deployment points the service at its neighbours: a config file of its own (design/4)
+    config = ingested.model_dump(mode="json", exclude={"embedding": {"api_key"}, "llm": {"api_key"}})
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(yaml.safe_dump(config))
+    monkeypatch.setenv("RAG_CONFIG_FILE", str(config_file))
     from siteops_rag.api import app
 
     with TestClient(app) as client:  # entering runs the lifespan

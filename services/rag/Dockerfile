@@ -22,6 +22,7 @@ COPY packages/common packages/common
 COPY services/rag services/rag
 RUN uv sync --frozen --package siteops-rag $EXTRAS
 
-ENV PATH="/app/.venv/bin:$PATH"
+# config.docker.yaml: Ollama on the host, Qdrant on the compose network; API keys, if any, come from compose
+ENV PATH="/app/.venv/bin:$PATH" RAG_CONFIG_FILE=/app/services/rag/config.docker.yaml
 EXPOSE 8000
 CMD ["uvicorn", "siteops_rag.api:app", "--host", "0.0.0.0", "--port", "8000"]
