@@ -77,7 +77,10 @@ rag_project/
 │   │   ├── cli.py              ENTRY   for a scheduler
 │   │   ├── container.py  config.py   ROOT
 │   │   ├── agent.py            FLOW    the window's LangGraph StateGraph: diagnose ⇄ tools until create_ticket or dismiss (agent/4)
-│   │   ├── models.py           CORE    LogEvent, Window (agent/9)
+│   │   ├── models.py           CORE    LogEvent, Window and its stable id (agent/9)
+│   │   ├── prompts.py          CORE    system prompt, a window numbered for the model; the only definition of line numbers
+│   │   ├── decision.py         CORE    TicketDraft, Dismissal (the model's judgement), check_draft, to_ticket_create (agent/10)
+│   │   ├── report.py           CORE    WindowOutcome, TriageReport: what a run reports, read by the eval (agent/4)
 │   │   ├── prefilter.py        CORE    LogEvents → Windows (agent/9), RULES (agent/12)
 │   │   ├── log_parser/   base.py  syslog.py                INTERFACE + ADAPTERS  line → LogEvent (agent/9: one adapter, no fake)
 │   │   ├── log_source/   base.py  file.py   memory.py      INTERFACE + ADAPTERS  a time range → LogEvents, whatever the source (agent/13)
@@ -85,9 +88,10 @@ rag_project/
 │   │   └── ticket_sink/  base.py  mcp.py    memory.py      (no llm/: the model is LangChain's BaseChatModel, design/1)
 │   └── tests/                  agent only; subfolders of unit/ mirror src/
 │       └── unit/
-│           ├── conftest.py              generate_logs: the generator script, loaded from its path
+│           ├── conftest.py              generate_logs (the generator script, loaded from its path), a window and its search hits
 │           ├── test_generated_logs.py   scripts/generate_logs.py: determinism, fault windows, decoys, ground truth, every line parses
-│           ├── test_models.py           LogEvent / Window: frozen and hashable
+│           ├── test_models.py           LogEvent / Window: frozen and hashable, Window.id
+│           ├── test_prompts.py  test_decision.py  test_report.py
 │           ├── test_prefilter.py        matching, merging, thresholds, context, cap, order; agent/12's recall on generated logs
 │           ├── log_parser/test_syslog.py
 │           └── log_source/          test_base.py (contract suite: memory + file)  test_file.py
