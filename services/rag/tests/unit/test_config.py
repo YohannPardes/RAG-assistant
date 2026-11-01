@@ -30,6 +30,7 @@ def test_defaults_apply_when_there_is_no_file(isolated_env) -> None:
 
     assert settings.embedding.dimension == 1024
     assert settings.chunking.max_length == 1000
+    assert settings.retrieval.top_k == 5
     assert settings.vector_store.backend == "qdrant"
 
 
@@ -48,6 +49,14 @@ def test_env_var_beats_dotenv_which_beats_yaml(isolated_env, tmp_path, monkeypat
 
 def test_misspelled_key_in_a_section_is_an_error(isolated_env) -> None:
     write_yaml(isolated_env, {"llm": {"modle": "qwen3.5:27b"}})
+
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)
+
+
+@pytest.mark.parametrize("top_k", [0, 51])
+def test_top_k_outside_what_a_request_may_ask_is_an_error(isolated_env, top_k) -> None:
+    write_yaml(isolated_env, {"retrieval": {"top_k": top_k}})
 
     with pytest.raises(ValidationError):
         Settings(_env_file=None)

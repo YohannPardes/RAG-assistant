@@ -48,7 +48,7 @@ def chat_model() -> FakeChatModel:
 
 @pytest.fixture
 def rag(embedder: FakeEmbedder, store: InMemoryVectorStore, chat_model: FakeChatModel) -> RAG:
-    return RAG(embedder=embedder, vector_store=store, chat_model=chat_model)
+    return RAG(embedder=embedder, vector_store=store, chat_model=chat_model, top_k=5)
 
 
 @pytest.fixture

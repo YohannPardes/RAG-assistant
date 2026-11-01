@@ -60,6 +60,10 @@ class ChunkingSettings(_Section):
     max_length: int = Field(default=1000, gt=0)
 
 
+class RetrievalSettings(_Section):
+    top_k: int = Field(default=5, ge=1, le=50)  # chunks retrieved when a request sends no top_k (rag/7)
+
+
 class VectorStoreSettings(_Section):
     backend: Literal["memory", "qdrant"] = "qdrant"  # in_memory or qdrant 
     url: str = "http://localhost:6333"
@@ -77,6 +81,7 @@ class Settings(BaseSettings):
     embedding: EmbeddingSettings = Field(default_factory=EmbeddingSettings)
     llm: LLMSettings = Field(default_factory=LLMSettings)
     chunking: ChunkingSettings = Field(default_factory=ChunkingSettings)
+    retrieval: RetrievalSettings = Field(default_factory=RetrievalSettings)
     vector_store: VectorStoreSettings = Field(default_factory=VectorStoreSettings)
 
     @classmethod

@@ -34,12 +34,14 @@ def test_ask_returns_a_cited_answer(api_client, chat_model, add_chunks) -> None:
     assert [h.chunk_id for h in body.hits] == ["c-disk"]
 
 
-def test_ask_default_top_k_is_five(api_client, add_chunks) -> None:
+@pytest.mark.parametrize(("path", "payload"), [("/ask", {"question": "disk"}), ("/search", {"query": "disk"})], ids=["ask", "search"])
+def test_request_without_top_k_uses_the_configured_default(client_for, embedder, store, chat_model, add_chunks, path, payload) -> None:
     add_chunks(*(Chunk(f"c{i}", "a.md", f"disk step {i}", ("A",), None) for i in range(7)))
+    client = client_for(RAG(embedder=embedder, vector_store=store, chat_model=chat_model, top_k=3))
 
-    response = api_client.post("/ask", json={"question": "disk"})
+    response = client.post(path, json=payload)
 
-    assert len(response.json()["hits"]) == 5
+    assert len(response.json()["hits"]) == 3
 
 
 def test_search_returns_the_ranked_hits(api_client, add_chunks) -> None:
@@ -74,7 +76,7 @@ def test_invalid_requests_are_rejected_with_422(api_client, path, payload) -> No
 
 @pytest.mark.parametrize(("path", "payload"), [("/ask", {"question": "disk full"}), ("/search", {"query": "disk full"})], ids=["ask", "search"])
 def test_embedding_backend_failure_is_a_502(client_for, failing_embedder, store, chat_model, path, payload) -> None:
-    client = client_for(RAG(embedder=failing_embedder, vector_store=store, chat_model=chat_model))
+    client = client_for(RAG(embedder=failing_embedder, vector_store=store, chat_model=chat_model, top_k=5))
 
     response = client.post(path, json=payload)
 
@@ -84,7 +86,7 @@ def test_embedding_backend_failure_is_a_502(client_for, failing_embedder, store,
 
 def test_llm_backend_failure_is_a_502(client_for, embedder, store, add_chunks) -> None:
     add_chunks(DISK)  # something must be retrieved, or the LLM is never called
-    client = client_for(RAG(embedder=embedder, vector_store=store, chat_model=_FailingChatModel()))
+    client = client_for(RAG(embedder=embedder, vector_store=store, chat_model=_FailingChatModel(), top_k=5))
 
     response = client.post("/ask", json={"question": "disk full"})
 
