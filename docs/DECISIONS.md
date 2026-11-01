@@ -142,6 +142,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
   - rag client: 10 s timeout, 2 retries on connection errors (`/search` is read-only).
   - MCP ticket sink: 10 s timeout, 2 retries on connection errors; safe because `create_ticket` is deduplicated by the server (agent/3).
   - model client: 120 s timeout, no retries (a slow model call is retried by nobody; the window ends unresolved).
+- **Implemented (2026-11-01):** `HttpRagClient` and `McpTicketSink` retry only errors where the request never reached the service (connect error or connect timeout); a read timeout, an error status or an invalid reply is not retried. Both raise their own error type (`RagError`, `TicketSinkError`), so the triage loop marks the window `error` without knowing the transport.
 - **Why:** simple fixed values; only calls that are safe to repeat are retried.
 - **Cost:** no backoff tuning or circuit breaker; a rag outage makes every window of a run slow to fail.
 
