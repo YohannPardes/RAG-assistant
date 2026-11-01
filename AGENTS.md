@@ -86,7 +86,8 @@ rag_project/
 │   │   └── llm/          base.py  openai_compat.py  fake.py
 │   └── tests/                  agent only; subfolders of unit/ mirror src/
 │       └── unit/
-│           ├── test_generated_logs.py   every line scripts/generate_logs.py writes parses
+│           ├── test_generated_logs.py   scripts/generate_logs.py: determinism, fault windows, decoys, ground truth, every line parses
+│           ├── test_models.py           LogEvent / Window: frozen and hashable
 │           └── log_parser/test_syslog.py
 │
 ├── services/tickets/

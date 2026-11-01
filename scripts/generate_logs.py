@@ -1,7 +1,7 @@
 """Synthetic site logs with seeded faults (scope/2): the triage agent's input and the eval's ground truth.
 
 Writes data/logs/site.log (normal noise from fake hosts, harmless one-off warnings, seeded faults) and
-data/logs/ground_truth.json (one entry per seeded fault: type, host, start, end, expected runbook).
+data/logs/ground_truth.json (one entry per seeded fault: type, host, affected hosts, start, end, expected runbook).
 The one-off warnings ("decoys") are not faults: a ticket for one counts as a false positive.
 Same seed and arguments give the same files.
 Usage: uv run python scripts/generate_logs.py [--seed 42] [--hours 4] [--start 2026-11-01T06:00:00Z] [--out-dir data/logs]
@@ -119,7 +119,8 @@ HOSTS: dict[str, tuple[float, Noise]] = {  # host → mean seconds between lines
 @dataclass(frozen=True)
 class Fault:
     fault_type: str
-    host: str  # where the fault is; other hosts may log its effects
+    host: str  # where the fault is (root cause); other hosts may log its effects
+    affected_hosts: tuple[str, ...]  # every host whose lines show the fault, `host` first (scope/4's matching rule)
     expected_runbook: str  # `source` of the runbook, as rag /search returns it
     emit: Callable[[random.Random, datetime, datetime], list[Line]]
     silences: tuple[str, ...]  # hosts whose normal noise stops during the fault (host down, or its lines replaced)
@@ -204,13 +205,20 @@ def pod_oomkilled(rng: random.Random, start: datetime, end: datetime) -> list[Li
 
 
 FAULTS = [
-    Fault("disk_full", "log-02", "runbook_disk_full.pdf", disk_full, ("log-02",)),
-    Fault("pg_primary_down", "db-primary-01", "runbook_db_failover.docx", pg_primary_down, ("db-primary-01", "db-replica-02")),
-    Fault("pg_replica_lag", "db-replica-02", "runbook_pg_replication_lag.html", pg_replica_lag, ("db-replica-02",)),
-    Fault("cert_expiry", "ingress-01", "runbook_cert_expiry.md", cert_expiry, ("probe-eu-1",)),
-    Fault("high_latency", "api-02", "runbook_high_latency.txt", high_latency, ("api-02",)),
-    Fault("api_error_rate", "api-03", "runbook_api_error_rate.md", api_error_rate, ("api-03",)),
-    Fault("pod_oomkilled", "k8s-node-03", "runbook_pod_oomkilled.html", pod_oomkilled, ("k8s-node-03",)),
+    Fault("disk_full", "log-02", ("log-02",), "runbook_disk_full.pdf", disk_full, silences=("log-02",)),
+    Fault(
+        "pg_primary_down",
+        "db-primary-01",  # silent while down: only its effects on the replica and the API hosts are logged
+        ("db-primary-01", "db-replica-02", "api-01", "api-02", "api-03"),
+        "runbook_db_failover.docx",
+        pg_primary_down,
+        silences=("db-primary-01", "db-replica-02"),
+    ),
+    Fault("pg_replica_lag", "db-replica-02", ("db-replica-02",), "runbook_pg_replication_lag.html", pg_replica_lag, silences=("db-replica-02",)),
+    Fault("cert_expiry", "ingress-01", ("ingress-01", "probe-eu-1"), "runbook_cert_expiry.md", cert_expiry, silences=("probe-eu-1",)),
+    Fault("high_latency", "api-02", ("api-02",), "runbook_high_latency.txt", high_latency, silences=("api-02",)),
+    Fault("api_error_rate", "api-03", ("api-03",), "runbook_api_error_rate.md", api_error_rate, silences=("api-03",)),
+    Fault("pod_oomkilled", "k8s-node-03", ("k8s-node-03",), "runbook_pod_oomkilled.html", pod_oomkilled, silences=("k8s-node-03",)),
 ]
 
 
@@ -254,7 +262,7 @@ def decoy_time(rng: random.Random, start: datetime, end: datetime, windows: list
             return t
 
 
-def generate(seed: int, start: datetime, hours: float) -> tuple[list[Line], list[dict[str, str]]]:
+def generate(seed: int, start: datetime, hours: float) -> tuple[list[Line], list[dict[str, str | list[str]]]]:
     """All log lines in time order, and the ground-truth entry of every seeded fault."""
     rng = random.Random(seed)
     end = start + timedelta(hours=hours)
@@ -269,13 +277,14 @@ def generate(seed: int, start: datetime, hours: float) -> tuple[list[Line], list
         for t in ticks(rng, start, end, mean_seconds)
         if not silenced(host, t)
     ]
-    faults = []
+    faults: list[dict[str, str | list[str]]] = []
     for number, (fault, fault_start, fault_end) in enumerate(windows, start=1):
         lines += fault.emit(rng, fault_start, fault_end)
         faults.append({
             "id": f"F{number}",
             "fault_type": fault.fault_type,
             "host": fault.host,
+            "affected_hosts": list(fault.affected_hosts),
             "start": iso(fault_start),
             "end": iso(fault_end),
             "expected_runbook": fault.expected_runbook,

@@ -1,6 +1,7 @@
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
+from types import MappingProxyType
 from typing import Literal, get_args
 
 Level = Literal["DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"]
@@ -16,8 +17,13 @@ class LogEvent:
     level: Level
     component: str  # the service or daemon that wrote the line: "patroni", "public-api"
     message: str
-    fields: Mapping[str, str]  # key=value pairs found in the message: {"duration_ms": "1168"}
+    # key=value pairs found in the message: {"duration_ms": "1168"}. Left out of the hash: a mapping has none,
+    # and it adds nothing (equal events have equal `raw`). Stored read-only, so the event really is frozen.
+    fields: Mapping[str, str] = field(hash=False)
     raw: str  # the line as read, without its line ending: quoted as the ticket's evidence
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "fields", MappingProxyType(dict(self.fields)))  # a copy: the caller's dict can't change it
 
 
 @dataclass(frozen=True)
