@@ -51,7 +51,7 @@ rag_project/
 │       ├── conftest.py             fixtures_dir, qdrant_url (skips without a Qdrant server) (shared)
 │       ├── unit/                   fast tier, no optional extras
 │       │   ├── conftest.py         fake adapters, a RAG built on them, API clients
-│       │   ├── test_rag.py  test_api.py  test_config.py  test_container.py  test_ingest_script.py
+│       │   ├── test_rag.py  test_api.py  test_config.py  test_container.py  test_ingest_script.py  test_eval_script.py
 │       │   ├── converter/test_text.py
 │       │   ├── embedder/           test_base.py  test_fake.py  test_openai_compat.py
 │       │   ├── ingestion/          test_chunking.py  test_pipeline.py
