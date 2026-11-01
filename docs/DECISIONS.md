@@ -16,7 +16,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 | `arch`    | [2. Architecture &amp; service boundaries](#2-architecture--service-boundaries)                           | arch/1 – arch/12      |
 | `design`  | [3. Code design &amp; dependency injection](#3-code-design--dependency-injection)                         | design/1 – design/4   |
 | `rag`     | [4. RAG pipeline: ingestion, retrieval &amp; generation](#4-rag-pipeline-ingestion-retrieval--generation) | rag/1 – rag/14        |
-| `agent`   | [5. Agent, access &amp; safety](#5-agent-access--safety)                                                  | agent/1 – agent/13    |
+| `agent`   | [5. Agent, access &amp; safety](#5-agent-access--safety)                                                  | agent/1 – agent/15    |
 | `tooling` | [6. Tooling, packaging &amp; testing](#6-tooling-packaging--testing)                                      | tooling/1 – tooling/6 |
 
 ## Open decisions by priority
@@ -389,6 +389,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - **Recommendation (implemented in the tickets service):** one shared key, `TICKETS_API_KEY`, from the environment (compose takes it from the shell or a git-ignored `.env`), at least 16 characters; the service refuses to start without it. Clients send `Authorization: Bearer <key>`; an ASGI middleware compares it in constant time (`hmac.compare_digest`) and answers 401 otherwise. `/health` needs no key. The port is published on 127.0.0.1 only.
 - **Why:** the only client is the agent, inside the compose network; per-client keys, rotation and scopes belong at the edge (arch/11).
 - **Cost:** one key for every client: no per-client revocation or audit of who opened a ticket. Rotating it means restarting the service and the agent.
+- **The agent's API (2026-11-01)** uses the same scheme: `AGENT_API__API_KEY` (a secret, design/4), `Authorization: Bearer`, compared in constant time, `/health` exempt. Only `api.py` needs it, so the setting is optional and the CLI runs without it; the API refuses to start without one.
 
 ### agent/6 — Scheduled / watcher-triggered triage
 
@@ -417,6 +418,15 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - **Why:** triage is measurable (seeded faults → precision/recall); chat has no ground truth yet, and adds user text as a second untrusted input to prompt-harden and test. Time budget before the interview goes to the measurable mode.
 - **Next step:** `/chat` = the same agent factory with a chat system prompt and the conversation history from the client (stateless). Tools, rag and tickets unchanged.
 - rag `/ask` remains the direct Q&A endpoint for users meanwhile.
+- **Amended (2026-11-01), chat is in scope:** the frontend's chat goes through the agent's API (agent/15). The engine behind it (agent/11) is built with the triage graph; until then `/chat` runs on a fake engine in tests only.
+- **Amended (2026-11-01), `POST /triage` is in scope:** the agent's HTTP API (`api.py`) runs the same job as the CLI.
+  - A run takes minutes, so `POST /triage {since, until, dry_run}` queues it and answers `202 {run_id}` at once; `GET /triage/{run_id}` returns its state (`queued`, `running`, `done` with the `TriageReport`, `failed` with the error) and `GET /triage` the recent runs.
+  - **One run at a time, in order:** one worker thread takes queued runs first in, first out. Parallel runs would share one model server: they wouldn't finish sooner and their calls would hit the 120 s timeout (arch/7).
+  - **A queue of 5:** up to 5 runs wait behind the running one; one more gets `503` with `Retry-After: 60` (the server is at capacity, the request isn't at fault). The same range submitted twice is two runs; the tickets service's dedup (agent/3) keeps the second from filing duplicates.
+  - **One process only:** the queue and the registry are in memory, so several API workers or replicas would each have their own. Scaling out would need a shared queue (a database table, or Redis).
+  - `GET /windows?since&until` previews the prefilter's windows (counts, no log text, no LLM): the debugging entry point.
+  - Runs are kept in memory (the last 50; past that the oldest finished ones are dropped, never a queued or running one): a restart forgets them, not their tickets. Writing reports to a volume is arch/8's, not done.
+  - Routes only: the work is `TriageRuns` (`runs.py`) and the job built by `container.py`; handlers are plain `def`, so the synchronous graph and the MCP sink's own event loop run off the server's loop.
 
 ### agent/9 — Log parser and prefilter: contract
 
@@ -518,6 +528,24 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - **Its lines are evidence:** numbered after the window's (`ShownLines`, agent/10 amended), and the host check accepts a host named in them.
 - **Why:** per-host windows see symptoms, not always the cause; asking for more beats widening every window for every run.
 - **Cost:** more untrusted log text reaches the model (agent/1, agent/9's security argument), bounded by the limits above; each call is a step of the window's budget (agent/4).
+
+### agent/15 — The agent's HTTP API for the frontend: chat, tickets, meta
+
+**Status:** Decided (2026-11-01)
+
+- The frontend is its own service and calls the agent through its own server under `/api/*` (no CORS). One router per area in `siteops_agent/api/` (`chat.py`, `tickets.py`, `meta.py`, `health.py`, `triage.py`, `windows.py`), assembled in `app.py`.
+- **`POST /chat`**, stateless (agent/8): `{messages, since, until, draft_ticket}` → `{turn_id, answered, answer, citations, steps, pending_ticket, warnings, model, latency_ms}`.
+  - `messages` is the whole history, as plain role and content (`user` / `assistant`; the last is the user's; at most 40, 8000 characters each). `since` / `until` is the log range in view.
+  - Every `[n]` marker of `answer` is a `citations[].n`, enforced by the contract (`chat/base.py`): the engine drops failed citations with their markers. A runbook citation carries `quote_start` / `quote_end` inside `chunk_text`, so the frontend can highlight the quote; a log citation carries the lines seen around it, the cited one flagged.
+  - `steps` lists the tool calls; a search step carries its hits, flagged `cited`, which the "I don't know" card shows when `answered` is false.
+  - A service the turn can do without (rag) degrades it with a `warning`; one it needs (the model) fails it with 502, or 504 when slow.
+- **Tickets from chat: a signed draft, confirmed by the user.** On a `draft_ticket` turn the engine proposes a ticket built by code from checked judgement, as in triage (agent/10), and `pending_ticket` returns it for display with a `draft_token`: the whole `TicketCreate` and an expiry (30 minutes), signed with HMAC-SHA256 (`drafts.py`). `POST /tickets {draft_token}` verifies it and files it through the `TicketSink`, answering `CreateTicketResult` (`created: false` = already open, agent/3).
+  - **Why a token:** the browser can't edit what gets filed. If it sent the ticket back, the facts the code filled in (evidence text, window times) could be forged on the way. Signing keeps the agent stateless.
+  - The chat engine never files a ticket itself: only the user's confirmation does.
+- **`GET /meta`:** `{model, log_range: {earliest, latest}, range_presets, tickets_enabled}`, read once at startup; `tickets_enabled` is false when no tickets service is configured, and `POST /tickets` then answers 503.
+- **One error shape** for every route (`errors.py`): `{"detail", "code"}`, `code` stable for the frontend to branch on (`invalid_request` 422, `unauthorized` 401, `invalid_draft` 422, `queue_full` / `tickets_disabled` 503, `upstream_failed` 502, `upstream_timeout` 504, `run_not_found` 404).
+- **Not built:** `GET /runbooks/section` (it needs rag to return a chunk's neighbours, which the tool probe showed adds nothing for triage), streaming steps over SSE, per-user auth (agent/2).
+- **Cost:** the draft secret must be shared by every API process, or a draft signed by one fails on another; the API runs as one process (agent/8). A draft expires after 30 minutes and must be written again.
 
 ---
 

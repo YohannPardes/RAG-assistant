@@ -18,7 +18,7 @@ from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, Settings
 # services/agent/ when running from the repo (this file is services/agent/src/siteops_agent/config.py).
 _SERVICE_DIR = Path(__file__).resolve().parents[2]
 
-SECRETS = {"tickets.api_key"}  # the only settings read from env vars and .env
+SECRETS = {"tickets.api_key", "api.api_key"}  # the only settings read from env vars and .env
 
 
 def _config_file() -> Path:
@@ -77,6 +77,14 @@ class TicketSinkSettings(_Section):
     retries: int = Field(ge=0)
 
 
+class ApiSettings(_Section):
+    host: str
+    port: int = Field(gt=0, lt=65536)
+    # agent/5: what callers of the agent's own API must send. Only `api.py` needs it, so the CLI runs without it;
+    # the API refuses to start without one (no default stands in for it, design/4)
+    api_key: SecretStr | None = Field(default=None, min_length=16)
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="AGENT_",
@@ -87,6 +95,7 @@ class Settings(BaseSettings):
 
     rag: RagClientSettings
     tickets: TicketSinkSettings
+    api: ApiSettings
 
     @classmethod
     def settings_customise_sources(

@@ -7,3 +7,7 @@ tickets:
   url: http://localhost:8002/mcp    # the tickets service's MCP endpoint, as docker-compose publishes it
   timeout: 10.0   # seconds per call
   retries: 2      # connection failures only; safe, the service deduplicates a repeated create (agent/3)
+
+api:              # the agent's own HTTP API (api.py): POST /triage, GET /triage/{run_id}, GET /windows
+  host: 127.0.0.1
+  port: 8001
