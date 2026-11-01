@@ -97,5 +97,5 @@ rag_project/
 │   ├── e2e/                    agent → rag → tickets for real
 │   └── eval/                   recall@5, triage precision/recall
 ├── scripts/                    ingest.py, generate_logs.py, run_eval.py
-└── data/                       runbooks/ (copies of services/rag/tests/fixtures/, read by scripts/ingest.py), logs/, golden_set.jsonl, eval_history.jsonl (one line per scripts/run_eval.py run)
+└── data/                       runbooks/ (30 runbooks in md/txt/html/docx/pdf, read by scripts/ingest.py; the 4 fixture runbooks are copied from services/rag/tests/fixtures/), logs/, golden_set.jsonl, eval_history.jsonl (one line per scripts/run_eval.py run)
 ```

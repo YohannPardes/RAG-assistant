@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>RB-601: Pods OOMKilled or in CrashLoopBackOff - Ops Wiki</title>
+<style>
+  body { font-family: Arial, Helvetica, sans-serif; max-width: 900px; margin: 0 auto; color: #222; }
+  nav, footer { font-size: 12px; color: #666; }
+  table { border-collapse: collapse; margin: 12px 0; }
+  th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: left; }
+  pre { background: #f5f5f5; padding: 8px; overflow-x: auto; }
+  aside.warning { border-left: 4px solid #d9534f; background: #fdf2f2; padding: 4px 12px; }
+</style>
+</head>
+<body>
+<nav>Ops Wiki &raquo; Runbooks &raquo; Kubernetes &raquo; RB-601</nav>
+<main>
+<h1>RB-601: Pods OOMKilled or in CrashLoopBackOff</h1>
+
+<table>
+  <tr><th>Service</th><td>Any Kubernetes workload (example: checkout-worker in namespace shop)</td></tr>
+  <tr><th>Severity</th><td>SEV-3 (SEV-2 if all replicas are down)</td></tr>
+  <tr><th>Owner</th><td>Kubernetes Platform team</td></tr>
+  <tr><th>Last reviewed</th><td>2026-10-12</td></tr>
+</table>
+
+<h2>1. Symptoms</h2>
+<ul>
+  <li>Alert <strong>KubePodOOMKilled</strong> fires when a container is OOMKilled more than <strong>2 times in 30 minutes</strong>.</li>
+  <li>Alert <strong>KubePodCrashLooping</strong> fires when a container restarts more than <strong>5 times in 10 minutes</strong>.</li>
+  <li><code>kubectl get pods</code> shows <code>CrashLoopBackOff</code>; the kubelet back-off between restarts doubles up to <strong>5 minutes</strong>.</li>
+</ul>
+
+<h2>2. Diagnosis</h2>
+
+<h3>2.1 Read the termination reason</h3>
+<pre><code class="language-bash">kubectl -n shop get pods -l app=checkout-worker
+kubectl -n shop describe pod &lt;POD_NAME&gt; | grep -A5 "Last State"
+kubectl -n shop logs &lt;POD_NAME&gt; --previous --tail=100</code></pre>
+<p>The <code>Last State: Terminated</code> block gives the reason and exit code. Always use <code>--previous</code>: the current container has just started and its log is empty.</p>
+
+<h3>2.2 OOMKilled: exit code 137</h3>
+<p>Reason <code>OOMKilled</code> with exit code <strong>137</strong> (128 + SIGKILL) means the container went over its memory <em>limit</em> and the kernel killed it. The request only affects scheduling and is never enforced. checkout-worker runs with a request of <strong>512Mi</strong> and a limit of <strong>1Gi</strong>. Compare with the usage just before the kill:</p>
+<pre><code class="language-bash">kubectl -n shop top pod -l app=checkout-worker --containers</code></pre>
+
+<h3>2.3 CrashLoopBackOff without OOMKilled</h3>
+<table>
+  <tr><th>Exit code</th><th>Meaning</th><th>Where to look</th></tr>
+  <tr><td>1</td><td>Application error at startup</td><td><code>logs --previous</code>: missing env var or config</td></tr>
+  <tr><td>143</td><td>SIGTERM from a failing liveness probe</td><td><code>describe pod</code> events: <code>Liveness probe failed</code></td></tr>
+  <tr><td>137</td><td>Killed for memory (see 2.2)</td><td><code>Last State</code> reason</td></tr>
+</table>
+
+<h2>3. Remediation</h2>
+
+<h3>3.1 Raise the memory limit with Helm</h3>
+<p>Change <code>resources.limits.memory</code> in <code>charts/checkout-worker/values-prod.yaml</code> in the <code>shop-deploy</code> repo. Raise it by at most <strong>50%</strong> per change (1Gi to 1536Mi) and keep the request at least half the limit. Limits above <strong>8Gi</strong> need Kubernetes Platform approval.</p>
+<pre><code class="language-bash">helm upgrade checkout-worker charts/checkout-worker -n shop \
+  -f charts/checkout-worker/values-prod.yaml --atomic --timeout 10m</code></pre>
+
+<h3>3.2 Size the JVM heap</h3>
+<p>For Java services set <code>JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=75.0</code> in the same values file and remove any fixed <code>-Xmx</code>. The heap then follows the container limit and leaves 25% for metaspace, threads and direct buffers. An <code>-Xmx</code> equal to the limit always ends in OOMKilled.</p>
+
+<aside class="warning"><p><strong>Warning:</strong> do not remove the memory limit entirely to stop the kills. An unbounded pod can take all memory on the node, putting it under MemoryPressure and evicting every other pod there (see RB-602).</p></aside>
+
+<h2>4. Verification</h2>
+<ul>
+  <li><code>kubectl -n shop get pods -l app=checkout-worker</code> shows the <code>RESTARTS</code> count unchanged for <strong>30 minutes</strong>.</li>
+  <li><code>kubectl top</code> shows memory below <strong>80%</strong> of the new limit under normal traffic.</li>
+  <li>KubePodOOMKilled and KubePodCrashLooping have resolved in Alertmanager.</li>
+</ul>
+
+<h2>5. Escalation</h2>
+<table>
+  <tr><th>Level</th><th>Who</th><th>Contact</th></tr>
+  <tr><td>L1</td><td>On-call SRE</td><td>#ops-oncall</td></tr>
+  <tr><td>L2</td><td>Kubernetes Platform on-call</td><td>PagerDuty: k8s-platform</td></tr>
+  <tr><td>L3</td><td>Owning service team</td><td>for memory leaks or startup bugs in the application</td></tr>
+</table>
+</main>
+<footer>Last edited by Dana Kowalski on 2026-10-12 &middot; Viewed 214 times &middot; Labels: kubernetes, memory, runbook</footer>
+</body>
+</html>

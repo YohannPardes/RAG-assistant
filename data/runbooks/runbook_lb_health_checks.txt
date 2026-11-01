@@ -1,0 +1,89 @@
+RB-314: LOAD BALANCER HEALTH CHECK FAILURES
+==========================================
+
+Service:        alb-web-prod and nlb-grpc-prod (eu-west-1)
+Severity:       SEV-2 (SEV-1 if all targets in a group are unhealthy)
+Owner:          Edge Networking team
+Last reviewed:  2026-07-15
+
+
+1. SYMPTOMS
+-----------
+
+  * Alert LbUnhealthyTargets fires: more than 30% of targets in a target
+    group are unhealthy for 3 minutes.
+  * Alert LbNoHealthyTargets fires: 0 healthy targets, the LB returns 503.
+  * ALB access logs show elb_status_code 502 or 503 with target_status "-".
+
+
+2. HEALTH CHECK SETTINGS
+------------------------
+
+  +-----------------+-----------+----------+---------+-----------+-----------+
+  | Target group    | Path/port | Interval | Timeout | Unhealthy | Healthy   |
+  +-----------------+-----------+----------+---------+-----------+-----------+
+  | tg-web-8080     | /healthz  | 10 s     | 5 s     | 3 checks  | 2 checks  |
+  | tg-grpc-9090    | TCP 9090  | 30 s     | 10 s    | 2 checks  | 3 checks  |
+  | tg-admin-8443   | /healthz  | 15 s     | 5 s     | 3 checks  | 5 checks  |
+  +-----------------+-----------+----------+---------+-----------+-----------+
+
+  A target on tg-web-8080 is marked unhealthy after about 30 s of failures
+  and needs 20 s of passing checks to return. /healthz must answer 200
+  within the 5 s timeout; any other code counts as a failure.
+
+
+3. DIAGNOSIS
+------------
+
+3.1 Which targets are unhealthy and why?
+
+    aws elbv2 describe-target-health --target-group-arn <TG_ARN> \
+      --query 'TargetHealthDescriptions[].[Target.Id,TargetHealth.Reason]'
+
+  Reason Target.Timeout points at networking or a hung app, while
+  Target.ResponseCodeMismatch means /healthz answered but not with 200.
+
+3.2 Does the health endpoint answer from inside the VPC?
+
+  From a host in the same subnet (for example jump-euw1-a):
+
+    curl -s -o /dev/null -w '%{http_code} %{time_total}\n' http://10.20.4.17:8080/healthz
+
+  If it answers 200 here but the LB still marks it unhealthy, the problem
+  is the path between the LB and the target, not the application.
+
+3.3 Security groups and NACLs
+
+  The target security group sg-web-targets must allow TCP 8080 from the
+  LB security group sg-alb-web-prod. Check for recent changes:
+
+    aws ec2 describe-security-groups --group-ids sg-web-targets
+    aws cloudtrail lookup-events --lookup-attributes \
+      AttributeKey=ResourceName,AttributeValue=sg-web-targets --max-results 10
+
+
+4. REMEDIATION
+--------------
+
+  1. If a security group rule was removed, restore the ingress rule for
+     TCP 8080 from sg-alb-web-prod and wait two intervals (20 s).
+  2. If /healthz times out because a dependency is slow, check that the
+     endpoint only tests the local process; it must not call orders-db.
+  3. Before replacing a bad instance, deregister it so in-flight requests
+     finish. Deregistration delay is 60 s on tg-web-8080, 300 s on
+     tg-grpc-9090:
+       aws elbv2 deregister-targets --target-group-arn <TG_ARN> --targets Id=<ID>
+
+  WARNING: do not lower the unhealthy threshold below 2 or the timeout
+  below 3 s to "make the alert go away"; one slow GC pause would then
+  eject healthy targets and cascade into LbNoHealthyTargets.
+
+
+5. ESCALATION
+-------------
+
+  L1  On-call SRE                  #ops-oncall
+  L2  Edge Networking on-call      PagerDuty: edge-net
+  L3  Cloud provider support       business-critical case if the LB itself is impaired
+
+  Related: RB-313 (CDN stale content), RB-415 (high API latency).

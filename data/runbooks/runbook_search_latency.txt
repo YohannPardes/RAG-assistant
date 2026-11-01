@@ -1,0 +1,109 @@
+RB-417: SEARCH SERVICE SLOW QUERIES
+===================================
+
+Service:        search-service (k8s namespace: search) + Elasticsearch cluster es-search
+Severity:       SEV-3 (SEV-2 if GET /v2/search p99 is above 1200 ms)
+Owner:          Search team
+Last reviewed:  2026-09-03
+
+
+1. SYMPTOMS
+-----------
+
+  * Alert SearchQueryLatencyHigh fires: search-service p95 query time above
+    1.5 s for 10 minutes.
+  * Alert EsHeapUsageHigh fires: JVM heap above 85% on any es-search data
+    node for 15 minutes.
+  * search-service logs "es_rejected_execution_exception" or
+    "circuit_breaking_exception" from Elasticsearch.
+
+
+2. CLUSTER LAYOUT
+-----------------
+
+  +----------------------------------+-------+----------------------------+
+  | Role                             | Count | Hosts                      |
+  +----------------------------------+-------+----------------------------+
+  | Master-eligible                  | 3     | es-search-master-01..03    |
+  | Data (64 GB RAM, 30 GB heap)     | 6     | es-search-data-01..06      |
+  +----------------------------------+-------+----------------------------+
+
+  Main index: "products" with 12 primary shards and 1 replica. HTTP port 9200.
+
+
+3. DIAGNOSIS
+------------
+
+3.1 Read the slow log
+
+  The slow log records any query above 500 ms (info) and above 2 s (warn).
+  On the data nodes it is written to:
+
+    /var/log/elasticsearch/es-search_index_search_slowlog.json
+
+  Typical offenders: leading-wildcard queries ("*phone") and deep paging
+  with from + size above 10000.
+
+3.2 Check node heap and CPU
+
+    curl -s 'http://es-search-data-01:9200/_cat/nodes?v&h=name,heap.percent,cpu,load_1m'
+
+  Heap steadily above 85% means old-GC pressure; look for long
+  "[gc][old]" pauses in /var/log/elasticsearch/es-search.log.
+
+3.3 Find hot threads and hot shards
+
+    curl -s 'http://es-search-data-01:9200/_nodes/hot_threads?threads=3'
+    curl -s 'http://es-search-data-01:9200/_cat/shards/products?v&s=store:desc'
+
+  If one node runs most of the busy search threads and holds two primaries
+  of "products", it is a hot node: see 4.3.
+
+3.4 Check circuit breakers
+
+    curl -s 'http://es-search-data-01:9200/_nodes/stats/breaker?pretty'
+
+  A growing "tripped" count on the "fielddata" breaker (limit 40% of heap)
+  means a query is aggregating on a text field.
+
+
+4. REMEDIATION
+--------------
+
+4.1 Block the offending query
+
+  Turn on the search-service guard that rejects leading wildcards and
+  pages deeper than 10000:
+
+    kubectl -n search set env deployment/search-service QUERY_GUARD=strict
+
+4.2 Clear the fielddata cache
+
+    curl -s -XPOST 'http://es-search-data-01:9200/products/_cache/clear?fielddata=true'
+
+  This frees heap within seconds and does not lose data. Expect slower
+  aggregations for about 10 minutes while the cache refills.
+
+4.3 Move a hot shard
+
+  Relocate one "products" shard off the hot node with _cluster/reroute,
+  or raise replicas from 1 to 2 so reads spread out. Only raise replicas
+  if disk use on every data node is below 70%.
+
+  WARNING: do not restart more than one es-search data node at a time,
+  and never without first setting cluster.routing.allocation.enable to
+  "primaries". Do not raise the heap above 30 GB.
+
+
+5. ESCALATION
+-------------
+
+  +-------+-----------------------------------+--------------------+
+  | Level | Who                               | Contact            |
+  +-------+-----------------------------------+--------------------+
+  | L1    | On-call SRE                       | #ops-oncall        |
+  | L2    | Search team on-call               | PagerDuty: search  |
+  | L3    | Search team lead (cluster red)    | PagerDuty: search  |
+  +-------+-----------------------------------+--------------------+
+
+  See also: RB-415 High API Latency.

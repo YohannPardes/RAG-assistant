@@ -1,0 +1,111 @@
+RB-103: INODE EXHAUSTION ON CI BUILD AGENTS
+===========================================
+
+Service:        CI build agents ci-agent-01 to ci-agent-12 (GitLab Runner)
+Severity:       SEV-3 (SEV-2 if more than 4 agents are affected)
+Owner:          Platform Ops team
+Last reviewed:  2026-07-15
+
+
+1. SYMPTOMS
+-----------
+
+  * Jobs fail with "No space left on device" during git checkout, npm ci
+    or go build, while df -h shows the disk only 30-50% used.
+  * Alert NodeInodeUsageHigh fires: inode usage on /var/lib/ci above 90%
+    for 15 minutes (critical above 97%).
+  * The same agent fails every job it picks up; other agents are fine.
+
+
+2. WHY THIS HAPPENS
+-------------------
+
+  /var/lib/ci is a 500 GB ext4 volume created with 32 million inodes.
+  Every file uses one inode however small it is, so millions of tiny files
+  (node_modules trees, Go build cache, pip wheels) run out of inodes long
+  before they run out of bytes.
+
+  +--------------------------------+------------------------------+
+  | Path                           | Typical file count           |
+  +--------------------------------+------------------------------+
+  | /var/lib/ci/builds             | 5-15 million (stale jobs)    |
+  | /var/lib/ci/cache/go-build     | 2-6 million                  |
+  | /var/lib/ci/cache/npm          | 1-3 million                  |
+  +--------------------------------+------------------------------+
+
+
+3. DIAGNOSIS
+------------
+
+3.1 Confirm inodes, not bytes
+
+    df -h /var/lib/ci
+    df -i /var/lib/ci
+
+  IUse% at 100% with Use% well below 100% confirms inode exhaustion.
+  If both are high, this is plain disk exhaustion: follow the cleanup in
+  section 4.2 anyway, then check build artefact sizes.
+
+3.2 Find the directories with the most files
+
+    sudo find /var/lib/ci -xdev -type f | cut -d/ -f1-6 | sort | uniq -c | sort -rn | head -20
+
+  This takes 5-10 minutes on a full agent; run it in tmux. Build
+  directories older than 2 days are always safe to remove.
+
+3.3 Check the nightly cleanup timer
+
+    systemctl status ci-cache-gc.timer
+    journalctl -u ci-cache-gc.service --since yesterday
+
+  The timer runs at 03:30 UTC and deletes cache files older than 7 days.
+  If its last run failed, the cache has been growing unchecked.
+
+
+4. REMEDIATION
+--------------
+
+4.1 Drain the agent
+
+    sudo gitlab-runner stop
+
+  This waits for running jobs to finish (shutdown timeout 30 minutes)
+  and stops the agent from picking up new ones. Post the agent name in
+  #ci-status so developers know why their jobs moved.
+
+4.2 Clean build directories and caches
+
+    sudo find /var/lib/ci/builds -mindepth 1 -maxdepth 1 -type d -mtime +2 -exec rm -rf {} +
+    sudo -u gitlab-runner go clean -cache
+    sudo rm -rf /var/lib/ci/cache/npm/_cacache
+    docker system prune -af --filter "until=48h"
+
+  Then run df -i again: IUse% should be below 60% before restarting.
+
+4.3 Return the agent to service
+
+    sudo gitlab-runner start
+
+  WARNING: do not run rm -rf on /var/lib/ci/builds while the runner is
+  still executing jobs, and do not delete /etc/gitlab-runner/config.toml;
+  it holds the runner registration token.
+
+4.4 Long-term fix
+
+  Ask Platform Ops to rebuild the agent volume with more inodes
+  (mkfs.ext4 -i 8192 doubles the count) through the ci-agents Terraform
+  module, one agent at a time.
+
+
+5. ESCALATION
+-------------
+
+  +-------+-----------------------------------+-------------------------+
+  | Level | Who                               | Contact                 |
+  +-------+-----------------------------------+-------------------------+
+  | L1    | On-call SRE                       | #ops-oncall             |
+  | L2    | Platform Ops on-call              | PagerDuty: platform-ops |
+  | L3    | Storage team (volume rebuild)     | PagerDuty: storage      |
+  +-------+-----------------------------------+-------------------------+
+
+  See also: RB-101 Disk Space Exhaustion on Log Servers.
