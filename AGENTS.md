@@ -77,13 +77,17 @@ rag_project/
 │   │   ├── cli.py              ENTRY   for a scheduler
 │   │   ├── container.py  config.py   ROOT
 │   │   ├── agent.py            CORE    LLM loop with tools
-│   │   ├── log_parser.py       CORE
-│   │   ├── prefilter.py        CORE
-│   │   ├── log_source/   base.py  file.py                  INTERFACE + ADAPTERS
+│   │   ├── models.py           CORE    LogEvent, Window (agent/9)
+│   │   ├── prefilter.py        CORE    LogEvents → Windows (agent/9)
+│   │   ├── log_parser/   base.py  syslog.py                INTERFACE + ADAPTERS  line → LogEvent (agent/9: one adapter, no fake)
+│   │   ├── log_source/   base.py  file.py
 │   │   ├── rag_client/   base.py  http.py   fake.py
 │   │   ├── ticket_sink/  base.py  mcp.py    memory.py
 │   │   └── llm/          base.py  openai_compat.py  fake.py
-│   └── tests/
+│   └── tests/                  agent only; subfolders of unit/ mirror src/
+│       └── unit/
+│           ├── test_generated_logs.py   every line scripts/generate_logs.py writes parses
+│           └── log_parser/test_syslog.py
 │
 ├── services/tickets/
 │   ├── pyproject.toml   Dockerfile
@@ -97,5 +101,5 @@ rag_project/
 │   ├── e2e/                    agent → rag → tickets for real
 │   └── eval/                   recall@5, triage precision/recall
 ├── scripts/                    ingest.py, generate_logs.py, run_eval.py
-└── data/                       runbooks/ (30 runbooks in md/txt/html/docx/pdf, read by scripts/ingest.py; the 4 fixture runbooks are copied from services/rag/tests/fixtures/), logs/, golden_set.jsonl, eval_history.jsonl (one line per scripts/run_eval.py run)
+└── data/                       runbooks/ (30 runbooks in md/txt/html/docx/pdf, read by scripts/ingest.py; the 4 fixture runbooks are copied from services/rag/tests/fixtures/), logs/ (site.log and ground_truth.json, written by scripts/generate_logs.py; site.log is git-ignored), golden_set.jsonl, eval_history.jsonl (one line per scripts/run_eval.py run)
 ```

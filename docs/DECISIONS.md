@@ -16,7 +16,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 | `arch`    | [2. Architecture &amp; service boundaries](#2-architecture--service-boundaries)                           | arch/1 – arch/11      |
 | `design`  | [3. Code design &amp; dependency injection](#3-code-design--dependency-injection)                         | design/1 – design/4   |
 | `rag`     | [4. RAG pipeline: ingestion, retrieval &amp; generation](#4-rag-pipeline-ingestion-retrieval--generation) | rag/1 – rag/13        |
-| `agent`   | [5. Agent, access &amp; safety](#5-agent-access--safety)                                                  | agent/1 – agent/8     |
+| `agent`   | [5. Agent, access &amp; safety](#5-agent-access--safety)                                                  | agent/1 – agent/9     |
 | `tooling` | [6. Tooling, packaging &amp; testing](#6-tooling-packaging--testing)                                      | tooling/1 – tooling/6 |
 
 ## Open decisions by priority
@@ -45,6 +45,8 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 
 - Faults (overheating, link drop, PSU error) + normal noise; each fault maps to a runbook entry.
 - **Why:** makes the agent *measurable* — ticket precision/recall, correct citation, no duplicates.
+- **Amended (2026-11-01), faults from the corpus:** no runbook covers overheating, link drop or PSU errors, so the seeded faults are the ones the runbooks describe: `disk_full`, `pg_primary_down`, `pg_replica_lag`, `cert_expiry`, `high_latency`, `api_error_rate`, `pod_oomkilled`. Each one's runbook has golden-set questions (scope/4), so a missed citation is a triage problem and not a gap in the corpus. `high_latency` and `api_error_rate` hit the same service on purpose, so the agent has to pick the right one of two similar runbooks.
+- **Generator:** `scripts/generate_logs.py` (seeded, deterministic) writes `data/logs/site.log`, one line per event: `<ISO 8601 UTC ms> <INFO|WARN|ERROR> <host> <component>: <message>` (agent/9's parser reads this format). It contains normal noise from 10 fake hosts, each fault once in its own time slot (no overlaps), and about two *decoys* an hour (a single slow request, one 504, a lag blip, a disk at 81% that logrotate fixes). Decoys are not faults: a ticket for one is a false positive. A fault's effects can show up on other hosts (a primary that is down shows up as write errors on the API hosts); the fault's `host` is where it is.
 
 ### scope/3 — Keep `reranker` and `api` in scope
 
@@ -61,6 +63,10 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - **Why:** with 4 runbooks, hand-written questions are cheap and more trustworthy than generated ones. Matching on section keeps recall@5 and MRR comparable across chunk sizes and with or without the reranker (scope/3).
 - **Update (2026-11-01), corpus with distractors:** `data/runbooks/` grows to 30 runbooks in five formats (md, txt, html, docx, pdf). The golden set covers 10 of them (~1/3) with 91 questions; the other 20 are distractors. About a third of the new runbooks are *near misses* that share vocabulary with a covered one (MySQL next to PostgreSQL failover, internal mesh CA next to public TLS, 5xx rate next to p99 latency…), so retrieval has to tell look-alikes apart. A question that a near miss could also answer is rephrased to name its system ("before a PostgreSQL failover"). A few runbooks parse badly on purpose or by Docling quirk (a DOCX without heading styles, a PDF whose title is read as a table caption); none of them is in the golden set.
 - **Why:** with 4 runbooks every question was found in the top 3 (recall@3 = 1.0), so the eval could not show a retrieval or reranker change (scope/3). With 30, recall@5 is 0.956 and MRR 0.841 (`data/eval_history.jsonl`).
+- **Update (2026-11-01), triage ground truth:** `data/logs/ground_truth.json`, written by `scripts/generate_logs.py` along with the log (scope/2). It holds the generator's seed and the log's time span, plus one entry per seeded fault: `{id, fault_type, host, affected_hosts, start, end, expected_runbook}`, where `host` is the root cause, `affected_hosts` every host whose lines show the fault (root included; for `pg_primary_down`: `db-primary-01`, `db-replica-02`, `api-01..03`), and `expected_runbook` the runbook's `source` as `/search` returns it.
+  `affected_hosts` is not written by the generator yet; it is needed before the triage eval.
+- **Matching rule (2026-11-01):** a ticket carries a `fault_type` chosen by the agent from a fixed list (a field of `TicketCreate`, added with the ticket contract), not inferred from its cited runbook, so the eval scores diagnosis and citation separately. A ticket matches a fault when it has the fault's type and its host is in the fault's `affected_hosts`. A fault is **detected** when at least one ticket matches it; further matching tickets are **duplicates**, reported as their own metric (not false positives, not hidden). A ticket that matches no fault is a false positive. Time is not part of the match: each fault type is seeded once and faults never overlap (scope/2).
+- **Why:** per-host windows (agent/9) see a fault's symptoms, not always its cause: a silent primary only shows up on other hosts. The agent's system prompt says "if the evidence points to another host as the cause, name that host in the ticket"; the duplicate count shows whether it does.
 
 ### scope/5 — Eval pass thresholds
 
@@ -339,15 +345,35 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - **Contracts:** `/search` and `/ask` request/response models live in `common` (arch/4).
 - **Cost:** a third service to build, deploy and test; agent → rag adds a network hop with its own timeouts and failure handling.
 
-### agent/8 — The agent is the user's front door
+### agent/8 — The agent is the users' front door (amended)
 
-**Status:** Decided (2026-10-27)
+**Status:** Decided (2026-10-27), amended (2026-11-01)
 
-- Users (UI, SDK) talk to the **agent** (`/chat`). The agent decides which tools to call: search runbooks (rag), open a ticket (tickets MCP).
-- The agent has two modes on the same tools: **chat** (user request) and **triage** (trigger: schedule / CLI).
-- **rag `/ask` is kept** as a direct Q&A endpoint and as the **evaluation baseline**: answer quality is measured without the agent loop's noise.
-- **Why:** matches the "autonomous agents" focus; one entry point; tools are reused across both modes.
-- **Cost:** every user question goes through an LLM loop (latency, cost, less determinism). The agent now receives **two untrusted inputs**, user text and logs, while holding the ticket permission, so tool permissions and ticket dedup matter more.
+- Design unchanged: one agent, two modes on the same tools: **triage** (trigger: CLI / schedule) and **chat** (user request).
+- **This version ships triage only** (`triage --since …`, optional `POST /triage`). `/chat` is deferred.
+- **Why:** triage is measurable (seeded faults → precision/recall); chat has no ground truth yet, and adds user text as a second untrusted input to prompt-harden and test. Time budget before the interview goes to the measurable mode.
+- **Next step:** `/chat` = the same agent factory with a chat system prompt and the conversation history from the client (stateless). Tools, rag and tickets unchanged.
+- rag `/ask` remains the direct Q&A endpoint for users meanwhile.
+
+### agent/9 — Log parser and prefilter: contract
+
+**Status:** Decided (2026-11-01), amended (2026-11-01)
+
+- **Pure logic:** no I/O, no LLM, same input → same output. `LogEvent` and `Window` live in `models.py`, shared with the agent and its tools.
+- **Line format:** the generator's (scope/2), `<ISO 8601 timestamp with zone, ms optional> <LEVEL> <host> <component>: <message>`. A message may hold `key=value` fields; the parser extracts them when present (the generator writes none today: `POST /v2/orders 201 1168ms`). Levels: DEBUG, INFO, WARN, ERROR, CRITICAL (the generator emits fewer).
+- **Parser is an ABC + one adapter per line format (amended):** `log_parser/base.py` holds `LogParser`, whose guarantees every parser shares (below); `log_parser/syslog.py` holds `SyslogStyleParser`, the generator's format. The ABC exists to state that contract once, not as a swap point: a log format is an external technology like a document format (`converter/`), so a second one (e.g. JSON lines) is a new adapter, not a change to callers. **Exception to design/1:** one implementation and no fake, since the real parser is already pure and fast. The prefilter stays concrete.
+- **Parser:** `LogParser.parse_line(line) -> LogEvent | None`, `LogParser.parse_lines(lines) -> (events, unparsable_count)`. Never raises: a malformed line, an unknown level included, gives `None` and is counted; the count goes in the triage summary, since a jump in it is itself a signal. Time is always timezone-aware UTC (correct `--since` comparisons). `raw` is the line unchanged (minus its line ending), quoted as the ticket's evidence. Colons and `=` inside text are not mangled. A timestamp without a zone is malformed (the zone is never guessed); blank lines are skipped, not counted; a repeated key keeps its first value.
+- **Prefilter:** `find_windows(events, rules) -> list[Window]` selects where the LLM looks; it does not diagnose. `Window.rule` is a hint, not a verdict.
+  - Rule kinds: **pattern** (one matching line fires), **threshold** (`min_count` matches `within` a span, e.g. a request slower than 800 ms five times in 5 minutes) and a **catch-all** `unknown`, last in the list, taking ERROR and CRITICAL events no other rule matched, so a fault without a rule still reaches the agent.
+  - An event goes to the first rule in list order that matches it.
+  - Windows group by (host, rule); matches merge when the gap between them is at most the rule's `within`. A threshold window starts at the first event of the run that reached `min_count`.
+  - Context: the 5 events of the same host before the first match, the 2 after the last.
+  - At most 50 events per window, the first and the last ones; `Window.omitted` counts the rest. Every event goes into the prompt, so this bounds its size.
+  - Windows are sorted by start time; same events → same windows (reproducible eval).
+  - Pure INFO noise gives no windows. Decoys (scope/2) may: the ERROR 504 one gives an `unknown` window, which the agent should decline to ticket.
+- **Why:** cost (the LLM sees a few windows, not 10,000 lines); testability (rules have exact, fast tests, only the diagnosis is left to the LLM); security (most untrusted log text never reaches the model, agent/1).
+- **Cost:** triage recall is capped by the prefilter: a fault no rule matches and that logs no ERROR is invisible. That is why recall is measured end to end (scope/4).
+- **Known limitation:** a host that goes silent produces no window. Detecting a *missing* signal needs another kind of detector (a scan over time per host, not a check per event); it is the next rule type, not built. `pg_primary_down` is caught through its symptoms on other hosts instead, and scope/4's `affected_hosts` makes that count.
 
 ---
 

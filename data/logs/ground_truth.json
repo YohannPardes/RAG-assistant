@@ -1,0 +1,64 @@
+{
+  "seed": 42,
+  "start": "2026-11-01T06:00:00Z",
+  "end": "2026-11-01T10:00:00Z",
+  "log_file": "site.log",
+  "faults": [
+    {
+      "id": "F1",
+      "fault_type": "api_error_rate",
+      "host": "api-03",
+      "start": "2026-11-01T06:30:49Z",
+      "end": "2026-11-01T06:46:20Z",
+      "expected_runbook": "runbook_api_error_rate.md"
+    },
+    {
+      "id": "F2",
+      "fault_type": "disk_full",
+      "host": "log-02",
+      "start": "2026-11-01T07:03:06Z",
+      "end": "2026-11-01T07:13:09Z",
+      "expected_runbook": "runbook_disk_full.pdf"
+    },
+    {
+      "id": "F3",
+      "fault_type": "pod_oomkilled",
+      "host": "k8s-node-03",
+      "start": "2026-11-01T07:29:37Z",
+      "end": "2026-11-01T07:39:08Z",
+      "expected_runbook": "runbook_pod_oomkilled.html"
+    },
+    {
+      "id": "F4",
+      "fault_type": "pg_replica_lag",
+      "host": "db-replica-02",
+      "start": "2026-11-01T07:58:35Z",
+      "end": "2026-11-01T08:12:31Z",
+      "expected_runbook": "runbook_pg_replication_lag.html"
+    },
+    {
+      "id": "F5",
+      "fault_type": "high_latency",
+      "host": "api-02",
+      "start": "2026-11-01T08:27:40Z",
+      "end": "2026-11-01T08:38:45Z",
+      "expected_runbook": "runbook_high_latency.txt"
+    },
+    {
+      "id": "F6",
+      "fault_type": "cert_expiry",
+      "host": "ingress-01",
+      "start": "2026-11-01T09:04:18Z",
+      "end": "2026-11-01T09:18:36Z",
+      "expected_runbook": "runbook_cert_expiry.md"
+    },
+    {
+      "id": "F7",
+      "fault_type": "pg_primary_down",
+      "host": "db-primary-01",
+      "start": "2026-11-01T09:31:11Z",
+      "end": "2026-11-01T09:45:53Z",
+      "expected_runbook": "runbook_db_failover.docx"
+    }
+  ]
+}
