@@ -8,6 +8,7 @@ dependencies = [                                 # runtime dependencies, install
     "langgraph>=1.2.19",
     "pydantic>=2",                               # data models and validation
     "pydantic-settings[yaml]>=2.16.1",
+    "regex>=2026.9.29",
     "siteops-common",                            # shared wire contracts
 ]
 

@@ -16,7 +16,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 | `arch`    | [2. Architecture &amp; service boundaries](#2-architecture--service-boundaries)                           | arch/1 – arch/12      |
 | `design`  | [3. Code design &amp; dependency injection](#3-code-design--dependency-injection)                         | design/1 – design/4   |
 | `rag`     | [4. RAG pipeline: ingestion, retrieval &amp; generation](#4-rag-pipeline-ingestion-retrieval--generation) | rag/1 – rag/13        |
-| `agent`   | [5. Agent, access &amp; safety](#5-agent-access--safety)                                                  | agent/1 – agent/13    |
+| `agent`   | [5. Agent, access &amp; safety](#5-agent-access--safety)                                                  | agent/1 – agent/14    |
 | `tooling` | [6. Tooling, packaging &amp; testing](#6-tooling-packaging--testing)                                      | tooling/1 – tooling/6 |
 
 ## Open decisions by priority
@@ -436,6 +436,8 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
   - **code checks** that `host` appears in the window's events (it may be the root cause, not the symptom host, scope/4), that every line number exists and the chunk_id was retrieved; a failed check goes back to the model as a tool error;
   - **code fills** the facts: window times, evidence text (the events' `raw`), the full `RunbookRef` from the retrieved hit; then it calls the MCP tool through a plain `mcp` client session (no MCP-to-LLM adapter).
   - **Implemented** in `decision.py` (`TicketDraft`, `Dismissal`, `check_draft`, `to_ticket_create`) and `prompts.py` (line numbers). A host counts as in the window if it wrote a line or a line names it as a whole word; every failed check is reported at once; an evidence line longer than 2000 characters is cut and marked `…`.
+  - **Amended (2026-11-01), lines shown:** evidence numbers and the host check cover every line *shown* to the model for the window, not only the window's: `ShownLines` numbers the window 1 to N and each `log_context` result after that (agent/14). The ticket's `window_start` / `window_end` stay the window's span.
+  - **Every tool calls our backend, never the materials (2026-11-01):** `search_runbooks` and `runbook_context` go through `RagClient` to rag (never Qdrant), `log_context` through `LogContext` over the events this run read (never the file or the source), `create_ticket` through `TicketSink` to the tickets service (never SQLite). Limits and checks live in that backend code, where the model can't skip them.
   - The narrow tool's description is the agent's (e.g. "use `dismiss` for transient or harmless events"); the MCP tool's description doesn't name agent tools, since any client may call it.
 - **Rejected (2026-11-01): code fixes `host` to the window's host and `fault_type` to the window's rule.** It would take dedup out of the model's hands, but a rule is only a hint (agent/9) and a fault's symptoms show up on other hosts: `pg_primary_down` would give one ticket per symptom host (agent/3, scope/4). The model's reach stays bounded instead: `host` must appear in the window, `fault_type` is one of the `FaultType` values, and the eval counts duplicates.
 - **Why:** `fault_type` is chosen by the agent, not inferred from its citation, so the eval scores diagnosis and citation separately (scope/4). `runbook` is optional because a forced citation would be an invented one.
@@ -487,6 +489,19 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - **Adapters (design/1):** `FileLogSource(path, parser=SyslogStyleParser())`, UTF-8 with undecodable bytes replaced, a missing file is an error (configuration, not an empty log); `MemoryLogSource(events, unparsable=0)` is the fake. One contract suite runs on both (tooling/5).
 - **Why:** sources differ in transport and format, not in what triage needs: events in a time range, plus a count of what couldn't be read.
 - **Cost:** a file is parsed whole on every read (fine for hours of logs; a large file would want an index or a seek by time). A source returns a batch, not an iterator, so a range must fit in memory.
+
+### agent/14 — `log_context`: more logs around a window
+
+**Status:** Decided (2026-11-01)
+
+- A tool for the triage model: `log_context(host, components, min_level, pattern, before, after)` returns the matching events up to `before` before the window, in its span, and up to `after` after it. Every filter is optional.
+- **Format-agnostic:** it filters `LogEvent` fields; `pattern` is a regex on the **message**, never on the raw line, so the model needn't know the log format and any source works (agent/13).
+- **Any host:** the model may read other hosts' events. The case it is for: an API-host window of `pg_primary_down` never names `db-primary-01`; the replica's lines do (agent/12's known cost).
+- **Backend, not material:** `LogContext` (CORE, `log_context.py`) over the `LogBatch` this run already read, so it can only see the run's `[since, until)` range and the same range gives the same context.
+- **Limits, in code (API bounds, design/4):** `before`, `after` ≤ 20; at most 30 events from the window's span (first and last 15, the rest counted as omitted); a pattern of ≤ 200 characters, matched with the `regex` package under a 100 ms budget for the whole query. A bad or slow pattern is an error the model reads and can correct.
+- **Its lines are evidence:** numbered after the window's (`ShownLines`, agent/10 amended), and the host check accepts a host named in them.
+- **Why:** per-host windows see symptoms, not always the cause; asking for more beats widening every window for every run.
+- **Cost:** more untrusted log text reaches the model (agent/1, agent/9's security argument), bounded by the limits above; each call is a step of the window's budget (agent/4).
 
 ---
 
