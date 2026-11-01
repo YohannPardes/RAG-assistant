@@ -16,7 +16,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 | `arch`    | [2. Architecture &amp; service boundaries](#2-architecture--service-boundaries)                           | arch/1 – arch/11      |
 | `design`  | [3. Code design &amp; dependency injection](#3-code-design--dependency-injection)                         | design/1 – design/4   |
 | `rag`     | [4. RAG pipeline: ingestion, retrieval &amp; generation](#4-rag-pipeline-ingestion-retrieval--generation) | rag/1 – rag/13        |
-| `agent`   | [5. Agent, access &amp; safety](#5-agent-access--safety)                                                  | agent/1 – agent/12    |
+| `agent`   | [5. Agent, access &amp; safety](#5-agent-access--safety)                                                  | agent/1 – agent/13    |
 | `tooling` | [6. Tooling, packaging &amp; testing](#6-tooling-packaging--testing)                                      | tooling/1 – tooling/6 |
 
 ## Open decisions by priority
@@ -453,6 +453,19 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - **Decoys:** the 1450 ms request, the 22 MB lag line, `log-01` at 81 %, the kubelet `exitCode=1` restart and the retried probe give no window; the ERROR 504 gives an `unknown` window for the agent to dismiss (504 is kept out of `slow_requests` and `http_5xx` for that).
 - **Why:** each seeded fault is caught by a named rule, so the rule is a useful hint (agent/9) and prefilter recall is 1 on the generator's logs, which a unit test can check without an LLM.
 - **Cost:** tuned to the generator's lines (they read as ordinary SRE alerts, but a new fault needs a new rule); end-to-end recall (scope/4) keeps that honest. The API hosts' pg_primary_down lines never name `db-primary-01`, and the probe's cert_expiry lines never name `ingress-01`: those windows can only ticket the symptom host, which scope/4 matches but counts as a duplicate.
+
+### agent/13 — Log source: one contract, whatever the source
+
+**Status:** Decided (2026-11-01)
+
+- `LogSource.read(since, until) -> LogBatch(events, unparsable)`: a source gives **`LogEvent`s**, not lines, so nothing downstream (prefilter, agent, report) knows where the logs came from. A text source (file, HTTP stream) composes a `LogParser` (agent/9); a structured one (database rows) builds the events itself and needs no parser.
+- **Guarantees, stated once in the ABC** (`read` is concrete, subclasses implement `_read`, as in `LogParser`): only events with `since <= time < until`; time order, ties in the source's order; `since` and `until` must be timezone-aware and in order, else `ValueError`.
+- **A closed range, never "until now":** the same range read twice gives the same batch, which makes a triage run repeatable (agent/4). Following a live stream is the watcher's job (agent/6), a different method when it is built.
+- `_read` may return events outside the range (`read` drops them), so a source that can't filter by time doesn't have to; one that can (a `WHERE time >= …` query) should, to read less.
+- `unparsable` counts the records read that gave no event, whatever their time (an unparsable line has none); it goes in the triage report.
+- **Adapters (design/1):** `FileLogSource(path, parser=SyslogStyleParser())`, UTF-8 with undecodable bytes replaced, a missing file is an error (configuration, not an empty log); `MemoryLogSource(events, unparsable=0)` is the fake. One contract suite runs on both (tooling/5).
+- **Why:** sources differ in transport and format, not in what triage needs: events in a time range, plus a count of what couldn't be read.
+- **Cost:** a file is parsed whole on every read (fine for hours of logs; a large file would want an index or a seek by time). A source returns a batch, not an iterator, so a range must fit in memory.
 
 ---
 
