@@ -13,6 +13,7 @@ from siteops_common.contracts import (
     SearchResponse,
     Ticket,
     TicketCreate,
+    fingerprint,
 )
 
 HIT = SearchHit(chunk_id="c1", source="runbook_disk_full.pdf", heading_path=["Disk full", "Fix"], page=2, text="Run df -h.", score=0.9)
@@ -141,3 +142,16 @@ def test_tickets_survive_a_trip_over_the_wire() -> None:
     result = CreateTicketResult(ticket=ticket, created=False)
 
     assert CreateTicketResult.model_validate_json(result.model_dump_json()) == result
+
+
+def test_the_fingerprint_is_the_fault_type_on_its_host() -> None:
+    assert fingerprint("disk_full", "log-02") == "disk_full|log-02"
+
+
+def test_the_fingerprint_ignores_case_and_spaces_around_the_host() -> None:
+    # "the same fault" must not depend on how the agent wrote the host (agent/3)
+    assert fingerprint("disk_full", "  LOG-02 ") == fingerprint("disk_full", "log-02")
+
+
+def test_another_fault_type_or_host_is_another_fingerprint() -> None:
+    assert len({fingerprint("disk_full", "log-02"), fingerprint("disk_full", "log-01"), fingerprint("high_latency", "log-02")}) == 3

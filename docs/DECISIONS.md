@@ -420,7 +420,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
   - The narrow tool's description is the agent's (e.g. "use `dismiss` for transient or harmless events"); the MCP tool's description doesn't name agent tools, since any client may call it.
 - **Rejected (2026-11-01): code fixes `host` to the window's host and `fault_type` to the window's rule.** It would take dedup out of the model's hands, but a rule is only a hint (agent/9) and a fault's symptoms show up on other hosts: `pg_primary_down` would give one ticket per symptom host (agent/3, scope/4). The model's reach stays bounded instead: `host` must appear in the window, `fault_type` is one of the `FaultType` values, and the eval counts duplicates.
 - **Why:** `fault_type` is chosen by the agent, not inferred from its citation, so the eval scores diagnosis and citation separately (scope/4). `runbook` is optional because a forced citation would be an invented one.
-- **Cost:** adding a fault type means changing `common`, hence rebuilding every image (arch/4). The fingerprint's composition is agent/3's, still open: the contract only carries it.
+- **Cost:** adding a fault type means changing `common`, hence rebuilding every image (arch/4). The fingerprint's composition is agent/3's; `common` defines it once, `fingerprint(fault_type, host)` (arch/4).
 
 ### agent/11 — Chat agent: LangChain `create_agent`
 

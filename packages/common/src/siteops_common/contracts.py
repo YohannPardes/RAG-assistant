@@ -1,4 +1,4 @@
-"""Wire contracts shared between services (arch/4). Pydantic models only, no logic."""
+"""Wire contracts shared between services (arch/4). Pydantic models, plus pure helpers that define a shared identity."""
 
 from typing import Annotated, Literal, Self
 
@@ -123,6 +123,12 @@ class TicketCreate(_Contract):
         if self.window_end < self.window_start:
             raise ValueError("window_end is before window_start")
         return self
+
+
+def fingerprint(fault_type: FaultType, host: str) -> str:
+    """ "The same fault" (agent/3): its type on its host. Case and spaces around the host don't matter.
+    One definition for the tickets store and the agent's in-memory sink (arch/4), so their dedup can't differ."""
+    return f"{fault_type}|{host.strip().lower()}"
 
 
 class Ticket(TicketCreate):
