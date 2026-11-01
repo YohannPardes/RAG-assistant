@@ -1,0 +1,19 @@
+services:
+  tickets:                                   # MCP server: create_ticket over streamable HTTP at /mcp (arch/6)
+    build:
+      context: .                             # repo root: the image needs packages/common too (arch/4)
+      dockerfile: services/tickets/Dockerfile
+    environment:
+      TICKETS_API_KEY: ${TICKETS_API_KEY:?set TICKETS_API_KEY (16+ characters) in the shell or in .env}
+    ports:
+      - "127.0.0.1:8002:8000"                # this machine only, for running the agent outside compose
+    volumes:
+      - tickets-data:/data                   # the SQLite file survives `docker compose down` (not `down -v`)
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  tickets-data:

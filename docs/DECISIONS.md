@@ -130,6 +130,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - **Non-AI clients:** if needed later, add a REST endpoint next to MCP, backed by the same store.
 - **Cost:** it is a network endpoint, so it needs auth (API key) and timeouts/retries.
 - **Tests:** unit tests call the tool functions directly or use an in-memory MCP client; one integration test over real HTTP.
+- **Implemented (2026-11-01):** official `mcp` SDK 2.x (`MCPServer`), one tool `create_ticket(ticket: TicketCreate) -> CreateTicketResult` at `/mcp`, schemas from `common`. **Stateless, JSON responses:** one tool call is one request, so no session or SSE stream to keep, and any number of replicas can serve it. The SDK's DNS-rebinding check (Host header must be localhost) is on only when bound to 127.0.0.1; the container binds 0.0.0.0, where the API key (agent/5) is the access check. The HTTP-level tests use the ASGI app in process; the test over a real socket comes with the agent's MCP client.
 
 ### arch/7 — Timeout and retry policy for network calls
 
@@ -142,6 +143,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 **Status:** Open · **Priority:** P2
 
 - Named volumes vs bind mounts; what survives `docker compose down`.
+- **Tickets, as built (2026-11-01):** named volume `tickets-data` mounted at `/data` (`TICKETS_DB_PATH=/data/tickets.db`): survives `down` and restarts (checked: dedup holds across a restart), removed by `down -v`. Qdrant still open.
 
 ### arch/9 — Distributed tracing (OpenTelemetry)
 
@@ -326,9 +328,12 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 
 ### agent/5 — Auth for the API and the MCP server
 
-**Status:** Open · **Priority:** P2
+**Status:** Proposed · **Priority:** P2
 
 - API key only? How keys are issued, stored and checked (the tickets store already plans an API-key check).
+- **Recommendation (implemented in the tickets service):** one shared key, `TICKETS_API_KEY`, from the environment (compose takes it from the shell or a git-ignored `.env`), at least 16 characters; the service refuses to start without it. Clients send `Authorization: Bearer <key>`; an ASGI middleware compares it in constant time (`hmac.compare_digest`) and answers 401 otherwise. `/health` needs no key. The port is published on 127.0.0.1 only.
+- **Why:** the only client is the agent, inside the compose network; per-client keys, rotation and scopes belong at the edge (arch/11).
+- **Cost:** one key for every client: no per-client revocation or audit of who opened a ticket. Rotating it means restarting the service and the agent.
 
 ### agent/6 — Scheduled / watcher-triggered triage
 
@@ -386,6 +391,11 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - `TicketCreate`: `fault_type`, `host` (root cause, may differ from the window's host), `severity` (SEV-1..3, the runbooks' scale), `title`, `summary` (incident report), **`suggested_fix`** (the agent's proposed remediation), `evidence` (raw log lines), `runbook` (chunk_id, source, heading path; `None` when none fits), `window_start` / `window_end` (timezone-aware, in order).
 - **`suggested_fix` is advice for a human, never executed** by any service. It is written by an agent that reads untrusted logs, so an injected log line could steer it ("run rm -rf …"): the agent loop (agent/4) should ground it in the cited runbook, and readers must treat it as unverified.
 - Every text field and list is bounded (title 200, summary and fix 4000, 1–20 evidence lines of ≤2000 chars): limits what a prompt-injected agent can write.
+- **The LLM never sees this contract (2026-11-01).** The MCP tool's schema is the full `TicketCreate`; handing it to the model would let it write facts (evidence text, window times, citations). The agent gives its LLM its own narrow `create_ticket` tool instead:
+  - **the LLM fills** the judgement: `fault_type`, `severity`, `title`, `summary`, `suggested_fix`, `host`, `evidence` as **line numbers into the window** (it can only point at real lines), `runbook` as a **chunk_id from a search it made in this loop**;
+  - **code checks** that `host` appears in the window's events (it may be the root cause, not the symptom host, scope/4), that every line number exists and the chunk_id was retrieved; a failed check goes back to the model as a tool error;
+  - **code fills** the facts: window times, evidence text (the events' `raw`), the full `RunbookRef` from the retrieved hit; then it calls the MCP tool through a plain `mcp` client session (no MCP-to-LLM adapter).
+  - The narrow tool's description is the agent's (e.g. "use `dismiss` for transient or harmless events"); the MCP tool's description doesn't name agent tools, since any client may call it.
 - **Why:** `fault_type` is chosen by the agent, not inferred from its citation, so the eval scores diagnosis and citation separately (scope/4). `runbook` is optional because a forced citation would be an invented one.
 - **Cost:** adding a fault type means changing `common`, hence rebuilding every image (arch/4). The fingerprint's composition is agent/3's, still open: the contract only carries it.
 

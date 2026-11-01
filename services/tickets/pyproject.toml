@@ -4,8 +4,11 @@ version = "0.1.0"                                # package version
 description = "Tickets service: MCP server over HTTP that creates deduplicated tickets. Owns the SQLite ticket store."  # one-line summary
 requires-python = ">=3.12"                       # minimum Python version
 dependencies = [                                 # runtime dependencies, installed in this service's image
+    "mcp>=2.3.0",
     "pydantic>=2",                               # data models and validation
-    "siteops-common",                            # shared wire contracts 
+    "pydantic-settings>=2.16.1",
+    "siteops-common",                            # shared wire contracts
+    "uvicorn>=0.54.0",
 ]
 
 [tool.uv.sources]                                # where uv gets dependencies from, instead of PyPI

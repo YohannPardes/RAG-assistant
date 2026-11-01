@@ -93,10 +93,14 @@ rag_project/
 ├── services/tickets/
 │   ├── pyproject.toml   Dockerfile
 │   ├── src/siteops_tickets/
-│   │   ├── server.py           ENTRY   MCP over HTTP + API-key check
-│   │   ├── store.py            CORE    SQLite, fingerprint dedup
-│   │   └── config.py
-│   └── tests/
+│   │   ├── server.py           ENTRY + ROOT   streamable HTTP, API-key check, /health: transport and wiring only
+│   │   ├── tools.py            CORE    every MCP tool (create_ticket) and its LLM-facing description
+│   │   ├── store.py            CORE    SQLite, fingerprint dedup (agent/3)
+│   │   └── config.py           ROOT    env settings (TICKETS_*)
+│   └── tests/unit/
+│       ├── conftest.py         a valid create_ticket payload
+│       ├── test_store.py       dedup window, host normalisation, restart, concurrent creates
+│       └── test_server.py      tool schema, calls and invalid payloads (in-process MCP client), API key over HTTP
 │
 ├── tests/                      SYSTEM  cross-service only
 │   ├── e2e/                    agent → rag → tickets for real
