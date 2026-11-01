@@ -3,7 +3,7 @@ import os
 import pytest
 from pydantic import SecretStr
 
-from siteops_rag.config import ChunkingSettings, EmbeddingSettings, LLMSettings, Settings, VectorStoreSettings
+from siteops_rag.config import ChunkingSettings, EmbeddingSettings, LLMSettings, RetrievalSettings, Settings, VectorStoreSettings
 from siteops_rag.container import build_pipeline, build_rag
 from siteops_rag.vector_store.memory import InMemoryVectorStore
 
@@ -19,6 +19,7 @@ def settings(monkeypatch, tmp_path) -> Settings:
         embedding=EmbeddingSettings(base_url="http://emb:1/v1", model="emb-model", dimension=8, api_key=SecretStr("emb-key")),
         llm=LLMSettings(base_url="http://llm:2/v1", model="llm-model", api_key=SecretStr("llm-key"), reasoning_effort="none"),
         chunking=ChunkingSettings(max_length=321),
+        retrieval=RetrievalSettings(top_k=7),
         vector_store=VectorStoreSettings(backend="memory"),
     )
 
@@ -30,6 +31,7 @@ def test_rag_is_built_from_the_settings(settings) -> None:
     assert rag.embedder.dimension == 8
     assert rag.chat_model.model == "llm-model"
     assert rag.chat_model.reasoning_effort == "none"
+    assert rag.top_k == 7
     # the store must expect the embedder's vectors, or every upsert fails
     assert isinstance(rag.vector_store, InMemoryVectorStore)
     assert (rag.vector_store.dimension, rag.vector_store.embedding_model) == (8, "emb-model")

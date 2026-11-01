@@ -239,6 +239,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 **Status:** Open · **Priority:** P2
 
 - k fetched from Qdrant before reranking, k kept after.
+- **Where k is set (2026-11-01):** `retrieval.top_k` in `services/rag/config.yaml` (default 5, 1–50) is used when a `/search` or `/ask` request sends no `top_k`; the contracts' `top_k` is optional (`None` = the service's default), so the number lives in one place. `scripts/run_eval.py` uses the same value unless `--top-k` is given. The value itself is still open: on the 91-question golden set recall@5 is 0.956 and recall@10 0.989.
 
 ### rag/8 — Reranker model
 

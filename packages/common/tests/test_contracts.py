@@ -7,9 +7,10 @@ HIT = SearchHit(chunk_id="c1", source="runbook_disk_full.pdf", heading_path=["Di
 
 
 @pytest.mark.parametrize("model", [SearchRequest, AskRequest])
-def test_requests_default_to_five_chunks(model) -> None:
+def test_requests_without_top_k_leave_it_to_the_service(model) -> None:
+    # the rag service fills in its configured default (retrieval.top_k): no number is fixed in the contract
     field = "query" if model is SearchRequest else "question"
-    assert model(**{field: "disk full"}).top_k == 5
+    assert model(**{field: "disk full"}).top_k is None
 
 
 @pytest.mark.parametrize(

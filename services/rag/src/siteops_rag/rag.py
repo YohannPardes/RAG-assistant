@@ -19,15 +19,16 @@ Reply with a JSON object: {{"answer": "...", "citations": [{{"excerpt": 1, "quot
 
 
 class RAG:
-    def __init__(self, embedder: Embedder, vector_store: VectorStore, chat_model: ChatModel) -> None:
+    def __init__(self, embedder: Embedder, vector_store: VectorStore, chat_model: ChatModel, top_k: int) -> None:
         self.embedder = embedder
         self.vector_store = vector_store
         self.chat_model = chat_model
+        self.top_k = top_k  # used when a call gives none (config: retrieval.top_k)
 
-    def search(self, query: str, top_k: int) -> list[ScoredChunk]:
-        return self.vector_store.search(self.embedder.embed(query), top_k)
+    def search(self, query: str, top_k: int | None = None) -> list[ScoredChunk]:
+        return self.vector_store.search(self.embedder.embed(query), self.top_k if top_k is None else top_k)
 
-    def search_response(self, query: str, top_k: int) -> SearchResponse:
+    def search_response(self, query: str, top_k: int | None = None) -> SearchResponse:
         start = time.perf_counter()
         scored = self.search(query, top_k)
         return SearchResponse(
@@ -36,7 +37,7 @@ class RAG:
             latency_ms=(time.perf_counter() - start) * 1000,
         )
 
-    def ask(self, question: str, top_k: int) -> AskResponse:
+    def ask(self, question: str, top_k: int | None = None) -> AskResponse:
         start = time.perf_counter()
         scored = self.search(question, top_k)
 

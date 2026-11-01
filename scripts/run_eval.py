@@ -2,7 +2,7 @@
 
 Every run is also appended as one line to data/eval_history.jsonl, so runs and their configs can be compared.
 Searches the configured collection as it is: run scripts/ingest.py first.
-Usage: uv run python scripts/run_eval.py [--top-k 5] [--golden-set data/golden_set.jsonl] [--history PATH | --no-history]
+Usage: uv run python scripts/run_eval.py [--top-k N] [--golden-set data/golden_set.jsonl] [--history PATH | --no-history]
 """
 
 import argparse
@@ -95,7 +95,7 @@ def append_history(path: Path, report: dict[str, Any]) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--top-k", type=int, default=5)  # same default as /search (rag/7)
+    parser.add_argument("--top-k", type=int, help="default: retrieval.top_k from the rag config, as /search uses (rag/7)")
     parser.add_argument("--golden-set", type=Path, default=REPO_ROOT / "data" / "golden_set.jsonl")
     parser.add_argument("--history", type=Path, default=HISTORY)
     parser.add_argument("--no-history", action="store_true", help="print the report without recording the run")
@@ -107,7 +107,8 @@ def main() -> None:
 
     settings = Settings()
     rag = build_rag(settings)
-    metrics, misses = evaluate(rows, rag.search, args.top_k)
+    top_k = settings.retrieval.top_k if args.top_k is None else args.top_k
+    metrics, misses = evaluate(rows, rag.search, top_k)
 
     report = {
         "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -118,7 +119,7 @@ def main() -> None:
             "chunk_max_length": settings.chunking.max_length,
             "vector_store": settings.vector_store.backend,
             "collection": settings.vector_store.collection,
-            "top_k": args.top_k,
+            "top_k": top_k,
             "reranker": "none",  # no reranker stage yet (rag/8): read it from the settings once there is one
             "golden_set": args.golden_set.name,
             "golden_set_sha256": file_hash(args.golden_set),

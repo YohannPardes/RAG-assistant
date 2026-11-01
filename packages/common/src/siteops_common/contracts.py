@@ -16,7 +16,7 @@ class SearchRequest(_Contract):
     """A query to retrieve runbook chunks for."""
 
     query: str = Field(min_length=1)
-    top_k: int = Field(default=5, ge=1, le=50)  # default matches the recall@5 eval (rag/7)
+    top_k: int | None = Field(default=None, ge=1, le=50)  # None: the rag service's configured default (rag/7)
 
 
 class SearchHit(_Contract):
@@ -45,7 +45,7 @@ class AskRequest(_Contract):
     """A question to answer from the runbooks."""
 
     question: str = Field(min_length=1)
-    top_k: int = Field(default=5, ge=1, le=50)  # how many chunks the LLM gets as context
+    top_k: int | None = Field(default=None, ge=1, le=50)  # chunks the LLM gets as context; None: the service default
 
 
 class Citation(_Contract):

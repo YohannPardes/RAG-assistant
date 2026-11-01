@@ -22,7 +22,12 @@ def build_rag(settings: Settings | None = None) -> RAG:
         reasoning_effort=llm.reasoning_effort,
         api_key=llm.api_key.get_secret_value(),
     )
-    return RAG(embedder=_embedder(settings), vector_store=_vector_store(settings), chat_model=chat_model)
+    return RAG(
+        embedder=_embedder(settings),
+        vector_store=_vector_store(settings),
+        chat_model=chat_model,
+        top_k=settings.retrieval.top_k,
+    )
 
 
 def build_pipeline(settings: Settings | None = None) -> RAGIngestionPipeline:
