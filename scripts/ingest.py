@@ -15,6 +15,7 @@ MEDIA_TYPES = {
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ".md": "text/markdown",
     ".txt": "text/plain",
+    ".html": "text/html",
 }
 
 
