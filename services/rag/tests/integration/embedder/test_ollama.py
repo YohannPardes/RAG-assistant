@@ -13,7 +13,9 @@ pytestmark = pytest.mark.integration
 @pytest.fixture(scope="module")
 def embedder(embedding_settings: EmbeddingSettings) -> OpenAICompatEmbedder:
     s = embedding_settings
-    return OpenAICompatEmbedder(base_url=s.base_url, embedding_model=s.model, dimension=s.dimension, batch_size=2, timeout=s.timeout)
+    return OpenAICompatEmbedder(
+        base_url=s.base_url, embedding_model=s.model, dimension=s.dimension, batch_size=2, timeout=s.timeout, max_retries=s.max_retries
+    )
 
 
 def cosine(a: list[float], b: list[float]) -> float:

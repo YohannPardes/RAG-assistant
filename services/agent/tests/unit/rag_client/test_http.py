@@ -23,7 +23,7 @@ def client(handler: Handler, retries: int = 2) -> tuple[HttpRagClient, list[http
         return handler(request)
 
     transport = httpx.Client(base_url="http://rag", transport=httpx.MockTransport(record))
-    return HttpRagClient("http://rag", retries=retries, client=transport), seen
+    return HttpRagClient("http://rag", timeout=10.0, retries=retries, client=transport), seen
 
 
 def ok(request: httpx.Request) -> httpx.Response:

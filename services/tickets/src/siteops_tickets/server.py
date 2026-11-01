@@ -52,14 +52,14 @@ class ApiKeyMiddleware:
 
 def build_app(settings: Settings) -> ASGIApp:
     """Composition root: the store, the MCP server, the HTTP app and its key check."""
-    store = TicketStore(settings.db_path, timedelta(minutes=settings.dedup_minutes))
+    store = TicketStore(settings.db_path, timedelta(minutes=settings.dedup_minutes), settings.db_lock_timeout)
     # stateless + JSON: no session to keep between calls and no SSE stream, as one tool call is one request
     http = build_server(store).streamable_http_app(stateless_http=True, json_response=True, host=settings.host)
     return ApiKeyMiddleware(http, settings.api_key.get_secret_value())
 
 
 def main() -> None:
-    settings = Settings()  # api_key comes from the environment
+    settings = Settings()  # config.yaml, and the API key from the environment
     uvicorn.run(build_app(settings), host=settings.host, port=settings.port)
 
 

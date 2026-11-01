@@ -32,11 +32,13 @@ class TicketStore:
     def __init__(
         self,
         path: Path | str,
-        dedup_window: timedelta = timedelta(minutes=60),
+        dedup_window: timedelta,
+        lock_timeout: float,  # seconds a write waits while another one holds the database lock
         now: Callable[[], datetime] = lambda: datetime.now(UTC),  # tests pass a fake clock
     ) -> None:
         self.path = str(path)
         self.dedup_window = dedup_window
+        self.lock_timeout = lock_timeout
         self._now = now
         with closing(self._connect()) as db:
             db.executescript(_SCHEMA)
@@ -61,4 +63,4 @@ class TicketStore:
 
     def _connect(self) -> sqlite3.Connection:
         # one connection per call: safe from any thread; transactions are explicit (BEGIN above)
-        return sqlite3.connect(self.path, isolation_level=None, timeout=10)
+        return sqlite3.connect(self.path, isolation_level=None, timeout=self.lock_timeout)

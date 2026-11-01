@@ -26,7 +26,7 @@ class Embedder(ABC):
     input validation, batching, and the "one vector per text, right size" check.
     """
 
-    def __init__(self, dimension: int, batch_size: int = 32, embedding_model: str = "") -> None:
+    def __init__(self, dimension: int, batch_size: int, embedding_model: str = "") -> None:
         if dimension <= 0 or batch_size <= 0:
             raise ValueError("dimension and batch_size must be positive")
         self.dimension = dimension

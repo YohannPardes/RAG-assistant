@@ -8,7 +8,7 @@ class _StubEmbedder(Embedder):
     """Backend that returns a fixed (possibly wrong) answer, to test the base class's checks."""
 
     def __init__(self, answer: list[Vector]) -> None:
-        super().__init__(dimension=2)
+        super().__init__(dimension=2, batch_size=32)
         self.answer = answer
 
     def _embed_batch(self, texts: list[str]) -> list[Vector]:

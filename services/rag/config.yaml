@@ -1,19 +1,26 @@
 embedding:
-  base_url: http://localhost:11434/v1 # Ollama's OpenAI-compatible API 
+  base_url: http://localhost:11434/v1 # Ollama's OpenAI-compatible API
   model: bge-m3
   dimension: 1024
   batch_size: 32
+  timeout: 30.0     # seconds per request
+  max_retries: 3    # connection failures only (server down, refused), not 5xx
 
 llm:
-  base_url: http://localhost:11434/v1   # Ollama's OpenAI-compatible API 
+  base_url: http://localhost:11434/v1   # Ollama's OpenAI-compatible API
   model: qwen3.5:27b
-  reasoning_effort: "none"   # thinking off: ~10x faster answers; low / medium / high turn it back on
+  reasoning_effort: "none"   # thinking off: ~10x faster answers; low / medium / high turn it back on, null = the server's default
+  temperature: 0.0
+  timeout: 120.0    # seconds per request
+  max_retries: 2    # connection failures only (server down, refused), not 5xx
 
 chunking:
-  max_length: 1000
+  max_length: 1000   # characters, heading prefix included
 
 retrieval:
   top_k: 10   # chunks retrieved (and given to the LLM) when a request sends no top_k
 
 vector_store:
+  backend: qdrant   # memory | qdrant
   url: http://localhost:6333
+  collection: runbooks

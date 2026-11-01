@@ -23,7 +23,7 @@ class McpTicketSink(TicketSink):
     Synchronous: call it from sync code, as it runs its own event loop per call.
     """
 
-    def __init__(self, url: str, api_key: str, timeout: float = 10.0, retries: int = 2) -> None:
+    def __init__(self, url: str, api_key: str, timeout: float, retries: int) -> None:
         self.url = url  # e.g. http://tickets:8000/mcp
         self._headers = {"Authorization": f"Bearer {api_key}"}
         self.timeout = timeout

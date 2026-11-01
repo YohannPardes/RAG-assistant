@@ -1,3 +1,4 @@
+from datetime import timedelta
 from typing import Any
 
 import anyio
@@ -27,7 +28,7 @@ def call(server, name: str, arguments: dict[str, Any] | None = None):
 
 @pytest.fixture
 def store(tmp_path) -> TicketStore:
-    return TicketStore(tmp_path / "tickets.db")
+    return TicketStore(tmp_path / "tickets.db", dedup_window=timedelta(minutes=60), lock_timeout=10.0)
 
 
 @pytest.fixture

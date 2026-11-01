@@ -32,7 +32,7 @@ rag_project/
 │   └── tests/test_contracts.py   validation rules, wire round trip
 │
 ├── services/rag/
-│   ├── pyproject.toml   Dockerfile
+│   ├── pyproject.toml   Dockerfile   config.yaml (every setting but secrets, design/4)   config.docker.yaml (the image's)   .env.example (the secrets' names)
 │   ├── src/siteops_rag/
 │   │   ├── api.py              ENTRY   /ask, /search
 │   │   ├── container.py        ROOT    builds everything from config
@@ -71,7 +71,7 @@ rag_project/
 │           └── images/                    diagrams (cert_renewal.png is referenced by the .md)
 │
 ├── services/agent/
-│   ├── pyproject.toml   Dockerfile
+│   ├── pyproject.toml   Dockerfile   config.yaml   .env.example
 │   ├── src/siteops_agent/
 │   │   ├── api.py              ENTRY   /triage
 │   │   ├── cli.py              ENTRY   for a scheduler
@@ -92,7 +92,7 @@ rag_project/
 │           ├── conftest.py              generate_logs (the generator script, loaded from its path), a window and its search hits
 │           ├── test_generated_logs.py   scripts/generate_logs.py: determinism, fault windows, decoys, ground truth, every line parses
 │           ├── test_models.py           LogEvent / Window: frozen and hashable, Window.id
-│           ├── test_prompts.py  test_decision.py  test_report.py
+│           ├── test_prompts.py  test_decision.py  test_report.py  test_config.py
 │           ├── test_prefilter.py        matching, merging, thresholds, context, cap, order; agent/12's recall on generated logs
 │           ├── log_parser/test_syslog.py
 │           ├── log_source/          test_base.py (contract suite: memory + file)  test_file.py
@@ -100,16 +100,17 @@ rag_project/
 │           └── ticket_sink/         conftest.py (a stand-in tickets MCP server on a local port)  test_base.py (contract suite: memory + mcp)  test_mcp.py
 │
 ├── services/tickets/
-│   ├── pyproject.toml   Dockerfile
+│   ├── pyproject.toml   Dockerfile   config.yaml   config.docker.yaml (the image's)   .env.example
 │   ├── src/siteops_tickets/
 │   │   ├── server.py           ENTRY + ROOT   streamable HTTP, API-key check, /health: transport and wiring only
 │   │   ├── tools.py            CORE    every MCP tool (create_ticket) and its LLM-facing description
 │   │   ├── store.py            CORE    SQLite, fingerprint dedup (agent/3)
-│   │   └── config.py           ROOT    env settings (TICKETS_*)
+│   │   └── config.py           ROOT    settings: config.yaml, TICKETS_API_KEY from env / .env
 │   └── tests/unit/
 │       ├── conftest.py         a valid create_ticket payload
 │       ├── test_store.py       dedup window, host normalisation, restart, concurrent creates
-│       └── test_server.py      tool schema, calls and invalid payloads (in-process MCP client), API key over HTTP
+│       ├── test_server.py      tool schema, calls and invalid payloads (in-process MCP client), API key over HTTP
+│       └── test_config.py      the real configs load; the key only from env / .env, settings only from the YAML
 │
 ├── tests/                      SYSTEM  cross-service only
 │   ├── e2e/                    agent → rag → tickets for real: conftest.py (the tickets app on a local port)  test_agent_to_tickets.py  test_agent_to_rag.py

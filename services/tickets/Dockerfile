@@ -25,7 +25,7 @@ RUN uv sync --frozen --package siteops-tickets
 RUN useradd --system --no-create-home tickets && mkdir /data && chown tickets /data
 USER tickets
 
-# 0.0.0.0: reachable from other containers; the API key is the access check (TICKETS_API_KEY, required)
-ENV PATH="/app/.venv/bin:$PATH" TICKETS_HOST=0.0.0.0 TICKETS_PORT=8000 TICKETS_DB_PATH=/data/tickets.db
+# config.docker.yaml binds 0.0.0.0 and keeps the database on /data; TICKETS_API_KEY (required) comes from compose
+ENV PATH="/app/.venv/bin:$PATH" TICKETS_CONFIG_FILE=/app/services/tickets/config.docker.yaml
 EXPOSE 8000
 CMD ["python", "-m", "siteops_tickets.server"]

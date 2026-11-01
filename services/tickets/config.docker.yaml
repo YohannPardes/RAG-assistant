@@ -1,0 +1,6 @@
+# the image's config (TICKETS_CONFIG_FILE in the Dockerfile)
+db_path: /data/tickets.db   # on the tickets-data volume (docker-compose.yml)
+db_lock_timeout: 10.0
+dedup_minutes: 60
+host: 0.0.0.0               # reachable from other containers: the API key is the access check
+port: 8000

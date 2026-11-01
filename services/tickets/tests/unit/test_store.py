@@ -24,7 +24,7 @@ def clock() -> Clock:
 
 @pytest.fixture
 def store(tmp_path, clock) -> TicketStore:
-    return TicketStore(tmp_path / "tickets.db", dedup_window=timedelta(minutes=60), now=clock)
+    return TicketStore(tmp_path / "tickets.db", dedup_window=timedelta(minutes=60), lock_timeout=10.0, now=clock)
 
 
 def stored(store: TicketStore) -> int:
@@ -75,9 +75,9 @@ def test_after_the_window_the_same_fault_is_a_new_ticket(store, clock, ticket) -
 
 
 def test_dedup_survives_a_restart(tmp_path, clock, ticket) -> None:
-    TicketStore(tmp_path / "tickets.db", now=clock).create(ticket)
+    TicketStore(tmp_path / "tickets.db", dedup_window=timedelta(minutes=60), lock_timeout=10.0, now=clock).create(ticket)
 
-    restarted = TicketStore(tmp_path / "tickets.db", now=clock)
+    restarted = TicketStore(tmp_path / "tickets.db", dedup_window=timedelta(minutes=60), lock_timeout=10.0, now=clock)
 
     assert not restarted.create(ticket).created
 

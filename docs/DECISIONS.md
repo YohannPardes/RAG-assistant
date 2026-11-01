@@ -201,11 +201,18 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 
 - Only one place (`container.py` / factory) reads env and instantiates concrete adapters; everything else receives dependencies via `__init__`.
 
-### design/4 — Configuration via environment (`pydantic-settings`) + `.env.example`
+### design/4 — Configuration: YAML for settings, `.env` for secrets only
 
-**Status:** Proposed
+**Status:** Decided (2026-11-01)
 
-- Only the composition root (design/3) reads settings.
+- Only the composition root (design/3) reads settings, through `pydantic-settings`.
+- **YAML is the only source of non-secret settings.** Each service's committed `config.yaml` holds every URL, model name, hyperparameter, timeout, retry count, path and port. Env vars do not override them. A deployment that needs other values (a container reaching `qdrant:6333` instead of `localhost:6333`, a test pointing at its own server) gets its own YAML file, selected with `<SERVICE>_CONFIG_FILE` (e.g. `RAG_CONFIG_FILE`), which is a path, not a setting.
+- **Secrets come only from `.env`** (uncommitted, `services/<service>/.env`) or from env vars of the same name, which is how compose and CI inject them. Secrets are never in the YAML: a secret key there is an error. A committed `.env.example` lists the secret names with empty values.
+- **No code defaults.** A setting missing from its source fails at startup instead of silently using a value nobody chose. The exceptions are `retrieval.top_k` (rag/7) and the rag service's model-server API keys, which default to `"EMPTY"` because local servers (Ollama, vLLM) ignore them. Adapter constructors take these values without defaults: the composition root always passes them.
+- **Values that stay in code:** the prefilter's context sizes, window cap and `RULES` (agent/9, agent/12); the wire contracts' limits (`top_k` ≤ 50, ticket field lengths), which are part of the API, not tuning.
+- **Why:** one place to read the whole configuration of a service, reviewed in git; secrets kept out of it.
+- **Cost:** every environment that differs needs its own YAML file instead of a one-line env override.
+- **Implemented (2026-11-01)** in all three services' `config.py`: env vars and `.env` are wrapped so that only the keys in `SECRETS` pass (any other key is an error), and the YAML source refuses those keys. Secrets: `RAG_EMBEDDING__API_KEY`, `RAG_LLM__API_KEY`, `TICKETS_API_KEY`, `AGENT_TICKETS__API_KEY`, listed in each service's `.env.example`. The rag and tickets images use their `config.docker.yaml` (`RAG_CONFIG_FILE`, `TICKETS_CONFIG_FILE`); rag's reaches Ollama on the host (`host.docker.internal:11434`) and Qdrant as `qdrant:6333`, and a test keeps its non-URL values equal to `config.yaml`'s. The agent's `Settings` (rag client, ticket sink) exists, but nothing reads it until its `container.py` is written.
 
 ---
 

@@ -24,7 +24,7 @@ TICKET = TicketCreate(
 
 
 def test_a_ticket_is_filed_then_deduplicated_by_the_service(tickets_url) -> None:
-    sink = McpTicketSink(tickets_url, API_KEY)
+    sink = McpTicketSink(tickets_url, API_KEY, timeout=10.0, retries=2)
 
     first = sink.create(TICKET)
     again = sink.create(TICKET.model_copy(update={"host": "DB-PRIMARY-01"}))  # same fingerprint (common's, arch/4)
@@ -35,4 +35,4 @@ def test_a_ticket_is_filed_then_deduplicated_by_the_service(tickets_url) -> None
 
 def test_the_service_refuses_a_wrong_key(tickets_url) -> None:
     with pytest.raises(TicketSinkError):
-        McpTicketSink(tickets_url, "wrong-key-0123456789").create(TICKET)
+        McpTicketSink(tickets_url, "wrong-key-0123456789", timeout=10.0, retries=2).create(TICKET)
