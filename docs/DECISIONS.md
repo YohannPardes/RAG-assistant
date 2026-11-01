@@ -15,8 +15,8 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 | `scope`   | [1. Scope &amp; evaluation](#1-scope--evaluation)                                                         | scope/1 – scope/6     |
 | `arch`    | [2. Architecture &amp; service boundaries](#2-architecture--service-boundaries)                           | arch/1 – arch/12      |
 | `design`  | [3. Code design &amp; dependency injection](#3-code-design--dependency-injection)                         | design/1 – design/4   |
-| `rag`     | [4. RAG pipeline: ingestion, retrieval &amp; generation](#4-rag-pipeline-ingestion-retrieval--generation) | rag/1 – rag/13        |
-| `agent`   | [5. Agent, access &amp; safety](#5-agent-access--safety)                                                  | agent/1 – agent/14    |
+| `rag`     | [4. RAG pipeline: ingestion, retrieval &amp; generation](#4-rag-pipeline-ingestion-retrieval--generation) | rag/1 – rag/14        |
+| `agent`   | [5. Agent, access &amp; safety](#5-agent-access--safety)                                                  | agent/1 – agent/13    |
 | `tooling` | [6. Tooling, packaging &amp; testing](#6-tooling-packaging--testing)                                      | tooling/1 – tooling/6 |
 
 ## Open decisions by priority
@@ -320,6 +320,16 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - Every `VectorStore` scores by cosine similarity (higher = more similar); Qdrant collections are created with `Distance.COSINE`. No configurable metric.
 - **Why:** embedding models like bge-m3 are trained for cosine; one metric keeps scores comparable across stores, so the contract tests and a future score threshold (rag/9) hold for all of them.
 - **Cost:** a model trained for dot product or Euclidean would need this revisited, and the collection recreated.
+
+### rag/14 — Every heading path starts with the document's identity
+
+**Status:** Decided (2026-11-01)
+
+- **Problem:** a chunk's prefix (rag/2, the heading path that starts every chunk and is embedded with it) named only its sections when the converter found no level-0 title: `5. Escalation`, or nothing at all. Every runbook has an escalation table, so those chunks read, and embedded, alike, and retrieval couldn't tell them apart (the escalation misses of the golden set).
+- **Decision:** the chunker starts every heading path with the document's title, its first non-blank level-0 heading, or its filename when it has none. Content before the title line is under the title too. Section headings at level 1 never replace it. A blank heading is ignored.
+- **Today:** 28 of the 30 runbooks already had a title. `runbook_bastion_lockout.docx` (no headings recognised at all) and `runbook_log_shipping_broken.pdf` (sections, no title) now get their filename. In both the real title is the first paragraph, which the converter doesn't tag as a heading. Recognising it is a converter fix, left for later.
+- **Golden-set labels are unchanged:** they name the last element of the path, and the integration test checks that every one still exists after ingestion.
+- **Cost:** the prefix takes room from each chunk's text (a long title means more, smaller chunks), and chunk ids change for the affected documents, so `data/runbooks` must be re-ingested (rag/12 replaces the stale chunks).
 
 ---
 

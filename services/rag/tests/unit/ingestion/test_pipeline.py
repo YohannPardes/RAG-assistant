@@ -9,8 +9,8 @@ from siteops_rag.ingestion.pipeline import RAGIngestionPipeline
 
 @pytest.fixture
 def pipeline(embedder, store) -> RAGIngestionPipeline:
-    # 60 characters: each paragraph below is its own chunk
-    return RAGIngestionPipeline(converter=TextMarkdownConverter(), chunker=Chunker(max_length=60), embedder=embedder, vector_store=store)
+    # 90 characters: each paragraph below is its own chunk, after its "<filename>\n\n" prefix (rag/14)
+    return RAGIngestionPipeline(converter=TextMarkdownConverter(), chunker=Chunker(max_length=90), embedder=embedder, vector_store=store)
 
 
 def txt(source: str, text: str) -> RawDocument:
@@ -18,11 +18,15 @@ def txt(source: str, text: str) -> RawDocument:
 
 
 def stored(store, embedder) -> dict[str, list[str]]:
-    """Every stored chunk's text, grouped by source."""
+    """Every stored chunk's text without its heading-path prefix, grouped by source."""
     by_source: dict[str, list[str]] = {}
     for hit in store.search(embedder.embed("anything"), top_k=1000):
-        by_source.setdefault(hit.chunk.source, []).append(hit.chunk.text)
+        by_source.setdefault(hit.chunk.source, []).append(body(hit.chunk))
     return {source: sorted(texts) for source, texts in by_source.items()}
+
+
+def body(chunk) -> str:
+    return chunk.text.removeprefix(f"{' > '.join(chunk.heading_path)}\n\n")
 
 
 LATENCY = "The p99 latency alert fires above 800 ms.\n\nRestart the api pods one at a time."
@@ -33,7 +37,7 @@ def test_ingested_document_is_searchable_under_its_source(pipeline, store, embed
 
     [hit] = store.search(embedder.embed("restart the api pods"), top_k=1)
     assert hit.chunk.source == "runbook_high_latency.txt"
-    assert hit.chunk.text == "Restart the api pods one at a time."
+    assert hit.chunk.text == "runbook_high_latency.txt\n\nRestart the api pods one at a time."  # a .txt has no title: its filename
     assert stored(store, embedder) == {"runbook_high_latency.txt": sorted(LATENCY.split("\n\n"))}
 
 

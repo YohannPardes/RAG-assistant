@@ -27,19 +27,27 @@ class Chunker:
     def chunk_elements(self, doc : Document) -> list[Chunk]:
         """Chunk the document into smaller pieces, each with a heading path and page number.
         Phase 1 splits each element into pieces that fit; phase 2 packs the pieces of one section together.
+
+        Every heading path starts with the document's identity, its title or else its filename (rag/14):
+        without it, "5. Escalation" of one runbook reads (and embeds) like "5. Escalation" of any other.
         """
 
+        title_index, title = self._title(doc)
         chunks : list[Chunk] = []
-        headings : list[tuple[int, str]] = []  # (level, text) of the open headings, outermost first
+        headings : list[tuple[int, str]] = []  # (level, text) of the open headings under the title, outermost first
         section : list[tuple[str, int | None]] = []  # (text, page) pieces of the current section
-        elem_list = doc.elements
-        for element in elem_list:
-            heading_path = tuple(text for _, text in headings)
+        for index, element in enumerate(doc.elements):
+            heading_path = (title, *(text for _, text in headings))
 
             # a heading is not a piece: it closes the section, so a chunk never spans two sections
             if element.kind == "heading" and element.level is not None:
+                if not element.text.strip():  # a blank heading (an empty Title style) names nothing: skipped
+                    continue
                 chunks.extend(self._pack_section(doc.source, heading_path, section))
                 section = []
+                if index == title_index:  # already the first element of every path; it closes whatever came before it
+                    headings.clear()
+                    continue
 
                 # it closes every open heading at its level or deeper, then opens itself
                 # (levels may skip or not start at 0, e.g. a docx without a title)
@@ -52,8 +60,16 @@ class Chunker:
             limit = self.max_length - self.length_func(self._prefix(heading_path))
             section.extend((piece, element.page) for piece in self._chunk_element(element, limit))
 
-        chunks.extend(self._pack_section(doc.source, tuple(text for _, text in headings), section))
+        chunks.extend(self._pack_section(doc.source, (title, *(text for _, text in headings)), section))
         return chunks
+
+    @staticmethod
+    def _title(doc : Document) -> tuple[int | None, str]:
+        """(position, text) of the document's title: its first level-0 heading, else (None, its filename)."""
+        for index, element in enumerate(doc.elements):
+            if element.kind == "heading" and element.level == 0 and element.text.strip():
+                return index, element.text
+        return None, doc.source
 
     @staticmethod
     def _prefix(heading_path : tuple[str, ...]) -> str:
