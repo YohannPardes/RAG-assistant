@@ -1,3 +1,4 @@
+import hashlib
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -36,3 +37,10 @@ class Window:
     end: datetime  # the last matching event's time
     events: tuple[LogEvent, ...]  # the matching events plus a little context before and after
     omitted: int = 0  # events left out by the size bound
+
+    @property
+    def id(self) -> str:
+        """Stable across runs: the same host, rule and span give the same id, so a window can be rerun alone
+        and its trace joined to the report (agent/4). The prefilter is pure, so rereading a range gives the same ids."""
+        key = f"{self.host}|{self.rule}|{self.start.isoformat()}|{self.end.isoformat()}"
+        return hashlib.sha256(key.encode()).hexdigest()[:12]
