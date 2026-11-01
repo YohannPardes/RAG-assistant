@@ -73,8 +73,8 @@ rag_project/
 ├── services/agent/
 │   ├── pyproject.toml   Dockerfile   config.yaml   .env.example
 │   ├── src/siteops_agent/
-│   │   ├── api.py              ENTRY   POST /triage (202, a run in the background), GET /triage[/{run_id}], GET /windows (agent/8)
-│   │   ├── runs.py             CORE    TriageRuns: one run at a time in a worker thread, the last 50 kept in memory
+│   │   ├── api.py              ENTRY   POST /triage (202 queued, 503 when the queue is full), GET /triage[/{run_id}], GET /windows (agent/8)
+│   │   ├── runs.py             CORE    TriageRuns: a queue of 5, one worker running them in order, the last 50 kept in memory
 │   │   ├── cli.py              ENTRY   for a scheduler
 │   │   ├── container.py  config.py   ROOT
 │   │   ├── agent.py            FLOW    the window's LangGraph StateGraph: diagnose ⇄ tools until create_ticket or dismiss (agent/4)

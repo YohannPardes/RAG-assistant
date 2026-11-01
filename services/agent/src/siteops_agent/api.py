@@ -16,7 +16,7 @@ from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from siteops_agent.models import Window
-from siteops_agent.runs import RunInProgress, RunStatus, TriageRequest, TriageRuns
+from siteops_agent.runs import QueueFull, RunStatus, TriageRequest, TriageRuns
 
 Preview = Callable[[datetime, datetime], list[Window]]  # the windows a run of [since, until) would triage
 
@@ -74,11 +74,12 @@ def build_app(runs: TriageRuns, preview: Preview, api_key: str) -> FastAPI:
 
     @app.post("/triage", status_code=202)
     def start_triage(request: TriageRequest) -> RunStatus:
-        """Start a run of [since, until) and return at once; follow it with GET /triage/{run_id}."""
+        """Queue a run of [since, until) and return at once; follow it with GET /triage/{run_id}.
+        503 when the queue is full: the server is at capacity for now, not the request at fault."""
         try:
             return runs.start(request)
-        except RunInProgress as error:
-            raise HTTPException(status_code=409, detail=str(error)) from error
+        except QueueFull as error:
+            raise HTTPException(status_code=503, detail=str(error), headers={"Retry-After": "60"}) from error
 
     @app.get("/triage")
     def list_runs() -> list[RunStatus]:

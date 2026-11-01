@@ -419,10 +419,12 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - **Next step:** `/chat` = the same agent factory with a chat system prompt and the conversation history from the client (stateless). Tools, rag and tickets unchanged.
 - rag `/ask` remains the direct Q&A endpoint for users meanwhile.
 - **Amended (2026-11-01), `POST /triage` is in scope:** the agent's HTTP API (`api.py`) runs the same job as the CLI.
-  - A run takes minutes, so `POST /triage {since, until, dry_run}` starts it in a worker thread and answers `202 {run_id}` at once; `GET /triage/{run_id}` returns its state (`running`, `done` with the `TriageReport`, `failed` with the error) and `GET /triage` the recent runs.
-  - **One run at a time** (one model server, traces in order): a second `POST` while one runs gets `409`. The same range submitted twice is two runs; the tickets service's dedup (agent/3) keeps the second from filing duplicates.
+  - A run takes minutes, so `POST /triage {since, until, dry_run}` queues it and answers `202 {run_id}` at once; `GET /triage/{run_id}` returns its state (`queued`, `running`, `done` with the `TriageReport`, `failed` with the error) and `GET /triage` the recent runs.
+  - **One run at a time, in order:** one worker thread takes queued runs first in, first out. Parallel runs would share one model server: they wouldn't finish sooner and their calls would hit the 120 s timeout (arch/7).
+  - **A queue of 5:** up to 5 runs wait behind the running one; one more gets `503` with `Retry-After: 60` (the server is at capacity, the request isn't at fault). The same range submitted twice is two runs; the tickets service's dedup (agent/3) keeps the second from filing duplicates.
+  - **One process only:** the queue and the registry are in memory, so several API workers or replicas would each have their own. Scaling out would need a shared queue (a database table, or Redis).
   - `GET /windows?since&until` previews the prefilter's windows (counts, no log text, no LLM): the debugging entry point.
-  - Runs are kept in memory (the last 50): a restart forgets them, not their tickets. Writing reports to a volume is arch/8's, not done.
+  - Runs are kept in memory (the last 50; past that the oldest finished ones are dropped, never a queued or running one): a restart forgets them, not their tickets. Writing reports to a volume is arch/8's, not done.
   - Routes only: the work is `TriageRuns` (`runs.py`) and the job built by `container.py`; handlers are plain `def`, so the synchronous graph and the MCP sink's own event loop run off the server's loop.
 
 ### agent/9 — Log parser and prefilter: contract

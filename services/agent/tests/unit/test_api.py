@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from siteops_agent.api import build_app
 from siteops_agent.models import Window
 from siteops_agent.report import TriageReport
-from siteops_agent.runs import TriageRequest, TriageRuns
+from siteops_agent.runs import MAX_QUEUED, TriageRequest, TriageRuns
 
 API_KEY = "agent-key-0123456789"
 AUTH = {"authorization": f"Bearer {API_KEY}"}
@@ -20,10 +20,12 @@ class Job:
 
     def __init__(self) -> None:
         self.release = threading.Event()
+        self.running = threading.Event()  # set once a run has started
         self.requests: list[TriageRequest] = []
 
     def __call__(self, run_id: str, request: TriageRequest) -> TriageReport:
         self.requests.append(request)
+        self.running.set()
         self.release.wait(timeout=5)
         return TriageReport(run_id=run_id, since=request.since, until=request.until, model="fake", events_read=3, unparsable=1, outcomes=[])
 
@@ -72,7 +74,8 @@ def test_a_run_is_started_then_followed_to_its_report(client, runs, job) -> None
 
     assert started.status_code == 202
     run_id = started.json()["run_id"]
-    assert started.json()["state"] == "running"
+    assert started.json()["state"] == "queued"  # the worker takes it next
+    assert job.running.wait(timeout=5)
     assert client.get(f"/triage/{run_id}", headers=AUTH).json()["state"] == "running"
 
     job.release.set()
@@ -84,14 +87,20 @@ def test_a_run_is_started_then_followed_to_its_report(client, runs, job) -> None
     assert job.requests == [TriageRequest(since=SINCE, until=SINCE + timedelta(hours=4), dry_run=True)]
 
 
-def test_a_second_run_while_one_is_going_is_a_conflict(client, runs, job) -> None:
+def test_runs_wait_in_the_queue_until_it_is_full(client, runs, job) -> None:
     first = client.post("/triage", json=RANGE, headers=AUTH).json()["run_id"]
+    assert job.running.wait(timeout=5)  # the first one runs, so it is not in the queue
 
-    second = client.post("/triage", json=RANGE, headers=AUTH)
+    waiting = [client.post("/triage", json=RANGE, headers=AUTH) for _ in range(MAX_QUEUED)]
+    full = client.post("/triage", json=RANGE, headers=AUTH)
 
-    assert second.status_code == 409 and first in second.json()["detail"]
+    assert [(r.status_code, r.json()["state"]) for r in waiting] == [(202, "queued")] * MAX_QUEUED
+    assert full.status_code == 503 and "full" in full.json()["detail"]
+    assert full.headers["retry-after"] == "60"
     job.release.set()
-    runs.wait(first, timeout=5)
+    for run_id in [first, *(r.json()["run_id"] for r in waiting)]:
+        assert runs.wait(run_id, timeout=5)
+    assert len(job.requests) == 1 + MAX_QUEUED  # every accepted run ran; the refused one never did
 
 
 def test_the_run_list_is_newest_first_without_reports(client, runs, job) -> None:
