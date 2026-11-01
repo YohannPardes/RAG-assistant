@@ -28,7 +28,7 @@ rag_project/
 │   ├── pyproject.toml          name: siteops-common
 │   └── src/siteops_common/
 │       ├── __init__.py
-│       └── contracts.py        SHARED  AskRequest/Response, SearchRequest/Response, FaultType, TicketCreate, Ticket, CreateTicketResult (agent/10)
+│       └── contracts.py        SHARED  AskRequest/Response, SearchRequest/Response, FaultType, TicketCreate, Ticket, CreateTicketResult (agent/10), fingerprint() (agent/3)
 │   └── tests/test_contracts.py   validation rules, wire round trip
 │
 ├── services/rag/

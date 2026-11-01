@@ -7,7 +7,7 @@ from contextlib import closing
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from siteops_common.contracts import CreateTicketResult, Ticket, TicketCreate
+from siteops_common.contracts import CreateTicketResult, Ticket, TicketCreate, fingerprint
 
 _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
@@ -20,11 +20,6 @@ CREATE TABLE IF NOT EXISTS tickets (
 );
 CREATE INDEX IF NOT EXISTS tickets_by_fingerprint ON tickets (fingerprint, created_at_us);
 """
-
-
-def fingerprint(ticket: TicketCreate) -> str:
-    """ "The same fault" (agent/3): its type on its host. Case and spaces around the host don't matter."""
-    return f"{ticket.fault_type}|{ticket.host.strip().lower()}"
 
 
 def _microseconds(time: datetime) -> int:
@@ -48,7 +43,7 @@ class TicketStore:
 
     def create(self, request: TicketCreate) -> CreateTicketResult:
         """The new ticket (created=True), or the recent one with the same fingerprint (created=False)."""
-        key = fingerprint(request)
+        key = fingerprint(request.fault_type, request.host)
         now = self._now()
         with closing(self._connect()) as db, db:  # `with db`: commit on success, rollback on error
             # take the write lock before reading: two identical tickets sent at once can't both be new
