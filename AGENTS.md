@@ -78,15 +78,17 @@ rag_project/
 │   │   ├── container.py  config.py   ROOT
 │   │   ├── agent.py            FLOW    the window's LangGraph StateGraph: diagnose ⇄ tools until create_ticket or dismiss (agent/4)
 │   │   ├── models.py           CORE    LogEvent, Window (agent/9)
-│   │   ├── prefilter.py        CORE    LogEvents → Windows (agent/9)
+│   │   ├── prefilter.py        CORE    LogEvents → Windows (agent/9), RULES (agent/12)
 │   │   ├── log_parser/   base.py  syslog.py                INTERFACE + ADAPTERS  line → LogEvent (agent/9: one adapter, no fake)
 │   │   ├── log_source/   base.py  file.py
 │   │   ├── rag_client/   base.py  http.py   fake.py
 │   │   └── ticket_sink/  base.py  mcp.py    memory.py      (no llm/: the model is LangChain's BaseChatModel, design/1)
 │   └── tests/                  agent only; subfolders of unit/ mirror src/
 │       └── unit/
+│           ├── conftest.py              generate_logs: the generator script, loaded from its path
 │           ├── test_generated_logs.py   scripts/generate_logs.py: determinism, fault windows, decoys, ground truth, every line parses
 │           ├── test_models.py           LogEvent / Window: frozen and hashable
+│           ├── test_prefilter.py        matching, merging, thresholds, context, cap, order; agent/12's recall on generated logs
 │           └── log_parser/test_syslog.py
 │
 ├── services/tickets/

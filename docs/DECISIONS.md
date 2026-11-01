@@ -16,7 +16,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 | `arch`    | [2. Architecture &amp; service boundaries](#2-architecture--service-boundaries)                           | arch/1 – arch/11      |
 | `design`  | [3. Code design &amp; dependency injection](#3-code-design--dependency-injection)                         | design/1 – design/4   |
 | `rag`     | [4. RAG pipeline: ingestion, retrieval &amp; generation](#4-rag-pipeline-ingestion-retrieval--generation) | rag/1 – rag/13        |
-| `agent`   | [5. Agent, access &amp; safety](#5-agent-access--safety)                                                  | agent/1 – agent/11    |
+| `agent`   | [5. Agent, access &amp; safety](#5-agent-access--safety)                                                  | agent/1 – agent/12    |
 | `tooling` | [6. Tooling, packaging &amp; testing](#6-tooling-packaging--testing)                                      | tooling/1 – tooling/6 |
 
 ## Open decisions by priority
@@ -337,6 +337,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - **Decision:** triage is a **LangGraph `StateGraph`**: a workflow, not an open agent. Code fixes the steps (read logs → parse → prefilter → for each window: diagnose → decide → validate → act → report); the LLM is called only inside a window, with a narrow tool set (`search_runbooks`, the narrow `create_ticket` and `dismiss` of agent/10), and every window ends in a ticket or a dismissal.
 - **Amended (2026-11-01): only the per-window loop is a graph.** The run (read → parse → prefilter → each window in turn → report) is plain sequential Python with no decision in it, so it stays framework-free and testable without LangGraph; it receives the per-window step as a callable. The one `StateGraph` is the window's: `diagnose ⇄ tools` until `create_ticket` or `dismiss` succeeds. Windows are processed one at a time.
 - **Before building it:** check that the model calls tools reliably (two or three real windows through `bind_tools`, thinking off): `search_runbooks`, then `create_ticket` or `dismiss`, with valid arguments. If it often answers in plain text, the window ends with a structured-output `decide` step instead of terminal tools.
+  - **Result (2026-11-01): terminal tools kept.** qwen3.5:27b on Ollama, thinking off, temperature 0, real retrieval, 4 hand-built seed-42 windows (high_latency, pg_primary_down seen from the replica, pod_oomkilled, the ERROR 504 decoy) × 2 runs: 8/8 as expected, every step a tool call, no invalid arguments, the same result on both runs, 4–24 s per window. It named the root host (`db-primary-01`) from the replica's lines and dismissed the decoy. One wrong citation: high_latency cited `runbook_search_latency.txt` after a third search, though its first search returned `runbook_high_latency.txt`. Citation quality is for the eval (scope/4), not a reason to change the loop.
 - **Repeatability:** temperature 0 and a fixed seed make runs *more* repeatable, not deterministic (GPU inference still varies). Idempotency comes from the fixed `[since, until)` range and the server's dedup (agent/3), not from the model.
 - The model is LangChain's `BaseChatModel` (design/1, amended); tests use `langchain_core`'s fake chat models.
 - Tools are written once, as LangChain tools, so the chat agent (agent/11) can reuse them later.
@@ -427,6 +428,31 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - **Recommendation:** an open tool-calling agent, LangChain's `create_agent`, on the same model and the same tools as triage (agent/4), with its own system prompt and limits. Its tools are read-only by default (`search_runbooks`, a bounded log query, a ticket lookup); creating a ticket from chat would need the user's confirmation (human-in-the-loop interrupt). Conversation history comes from the client (stateless, agent/8).
 - **Why:** user questions have no fixed path, so the model chooses the tools; triage's guarantees come from its graph, which chat doesn't need.
 - **Cost:** user text is a second untrusted input (agent/8); who may ask what depends on agent/2.
+
+### agent/12 — Prefilter rules
+
+**Status:** Decided (2026-11-01)
+
+- The rules `find_windows` (agent/9) runs on, in this order; an event goes to the first rule whose component, level and pattern match it (a threshold rule consumes the event even when its count is never reached).
+- **One shape:** `Rule(name, pattern, components=None, min_level, min_count=1, within)`. A pattern rule is `min_count=1`; a threshold rule fires when `min_count` matches fall within `within`.
+
+| # | Rule | Component · level · message pattern | `min_count` / `within` | Seeded fault (scope/2) |
+|---|---|---|---|---|
+| 1 | `db_leader_unreachable` | `patroni` · WARN+ · `unreachable\|Connection refused\|no automatic failover` | 1 / 10 min | pg_primary_down (replica) |
+| 2 | `db_write_failed` | `public-api` · ERROR+ · `write failed\|recovery mode` | 1 / 5 min | pg_primary_down (API hosts) |
+| 3 | `tls_certificate` | any · WARN+ · `certificate has expired\|x509\|SSL_do_handshake\(\) failed\|renewal failed` | 1 / 10 min | cert_expiry |
+| 4 | `disk_pressure` | any · WARN+ · `usage (8[5-9]\|9\d\|100)%\|No space left on device` | 1 / 10 min | disk_full |
+| 5 | `pod_crashloop` | `kubelet` · WARN+ · `OOMKilled\|CrashLoopBackOff` | 1 / 10 min | pod_oomkilled |
+| 6 | `replica_lag` | `pg-monitor` · WARN+ · `replica lag` | 3 / 5 min | pg_replica_lag |
+| 7 | `slow_requests` | `public-api` · WARN+ · `^\S+ \S+ \d{3} \d+ms$` (an access line: a 504 timeout has another shape) | 5 / 5 min | high_latency |
+| 8 | `http_5xx` | `public-api` · ERROR+ · `\s50[0-3]\s` | 3 / 5 min | api_error_rate |
+| 9 | `unknown` | any · ERROR+ · anything | 1 / 5 min | catch-all |
+
+- **Principles:** one rule per symptom family, so a fault opens one window per host (fewer LLM calls); specific before generic (`db_write_failed` before `http_5xx`); thresholds where one line means nothing, patterns where one line is already a fault; a 10-minute `within` for faults that repeat slowly (OOMKill back-off up to 5 min, renewal failures every 5 min).
+- **Implemented** in `prefilter.py` as `RULES`; a test runs them on the generator's logs (seeds 1, 7, 42): every fault gets a window from its rule, and outside the faults only the ERROR 504 decoy opens one (seed 42: 13 windows, 4 of them pg_primary_down's, 2 cert_expiry's).
+- **Decoys:** the 1450 ms request, the 22 MB lag line, `log-01` at 81 %, the kubelet `exitCode=1` restart and the retried probe give no window; the ERROR 504 gives an `unknown` window for the agent to dismiss (504 is kept out of `slow_requests` and `http_5xx` for that).
+- **Why:** each seeded fault is caught by a named rule, so the rule is a useful hint (agent/9) and prefilter recall is 1 on the generator's logs, which a unit test can check without an LLM.
+- **Cost:** tuned to the generator's lines (they read as ordinary SRE alerts, but a new fault needs a new rule); end-to-end recall (scope/4) keeps that honest. The API hosts' pg_primary_down lines never name `db-primary-01`, and the probe's cert_expiry lines never name `ingress-01`: those windows can only ticket the symptom host, which scope/4 matches but counts as a duplicate.
 
 ---
 
