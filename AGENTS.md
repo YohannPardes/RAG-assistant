@@ -90,6 +90,8 @@ rag_project/
 │   │   ├── models.py           CORE    LogEvent, Window and its stable id (agent/9)
 │   │   ├── prompts.py          CORE    system prompt, a window and context numbered for the model; ShownLines, the only definition of line numbers
 │   │   ├── log_context.py      CORE    LogQuery, LogContext: more events around a window, from this run's events (agent/14)
+│   │   ├── triage_tools.py     CORE    TriageTools: one window's tools (search, log context, ticket, dismiss) and memory
+│   │   ├── tools.py            FLOW    TriageTools as LangChain tools: names, descriptions, schemas (what the model reads)
 │   │   ├── decision.py         CORE    TicketDraft, Dismissal (the model's judgement), check_draft, to_ticket_create (agent/10)
 │   │   ├── report.py           CORE    WindowOutcome, TriageReport: what a run reports, read by the eval (agent/4)
 │   │   ├── prefilter.py        CORE    LogEvents → Windows (agent/9), RULES (agent/12)
@@ -103,7 +105,7 @@ rag_project/
 │           ├── conftest.py              generate_logs (the generator script, loaded from its path), a window and its search hits
 │           ├── test_generated_logs.py   scripts/generate_logs.py: determinism, fault windows, decoys, ground truth, every line parses
 │           ├── test_models.py           LogEvent / Window: frozen and hashable, Window.id
-│           ├── test_prompts.py  test_decision.py  test_report.py  test_config.py  test_log_context.py  test_runs.py  test_drafts.py
+│           ├── test_prompts.py  test_decision.py  test_report.py  test_config.py  test_log_context.py  test_triage_tools.py  test_runs.py  test_drafts.py
 │           ├── api/                 conftest.py (the API on fakes)  test_app.py  test_chat.py  test_tickets.py  test_triage.py  test_windows.py  test_meta.py
 │           ├── chat/test_base.py    the turn contract: markers, offsets, proposals
 │           ├── test_prefilter.py        matching, merging, thresholds, context, cap, order; agent/12's recall on generated logs
