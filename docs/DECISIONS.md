@@ -16,7 +16,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 | `arch`    | [2. Architecture &amp; service boundaries](#2-architecture--service-boundaries)                           | arch/1 – arch/12      |
 | `design`  | [3. Code design &amp; dependency injection](#3-code-design--dependency-injection)                         | design/1 – design/4   |
 | `rag`     | [4. RAG pipeline: ingestion, retrieval &amp; generation](#4-rag-pipeline-ingestion-retrieval--generation) | rag/1 – rag/14        |
-| `agent`   | [5. Agent, access &amp; safety](#5-agent-access--safety)                                                  | agent/1 – agent/13    |
+| `agent`   | [5. Agent, access &amp; safety](#5-agent-access--safety)                                                  | agent/1 – agent/15    |
 | `tooling` | [6. Tooling, packaging &amp; testing](#6-tooling-packaging--testing)                                      | tooling/1 – tooling/6 |
 
 ## Open decisions by priority
@@ -418,6 +418,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - **Why:** triage is measurable (seeded faults → precision/recall); chat has no ground truth yet, and adds user text as a second untrusted input to prompt-harden and test. Time budget before the interview goes to the measurable mode.
 - **Next step:** `/chat` = the same agent factory with a chat system prompt and the conversation history from the client (stateless). Tools, rag and tickets unchanged.
 - rag `/ask` remains the direct Q&A endpoint for users meanwhile.
+- **Amended (2026-11-01), chat is in scope:** the frontend's chat goes through the agent's API (agent/15). The engine behind it (agent/11) is built with the triage graph; until then `/chat` runs on a fake engine in tests only.
 - **Amended (2026-11-01), `POST /triage` is in scope:** the agent's HTTP API (`api.py`) runs the same job as the CLI.
   - A run takes minutes, so `POST /triage {since, until, dry_run}` queues it and answers `202 {run_id}` at once; `GET /triage/{run_id}` returns its state (`queued`, `running`, `done` with the `TriageReport`, `failed` with the error) and `GET /triage` the recent runs.
   - **One run at a time, in order:** one worker thread takes queued runs first in, first out. Parallel runs would share one model server: they wouldn't finish sooner and their calls would hit the 120 s timeout (arch/7).
@@ -527,6 +528,24 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - **Its lines are evidence:** numbered after the window's (`ShownLines`, agent/10 amended), and the host check accepts a host named in them.
 - **Why:** per-host windows see symptoms, not always the cause; asking for more beats widening every window for every run.
 - **Cost:** more untrusted log text reaches the model (agent/1, agent/9's security argument), bounded by the limits above; each call is a step of the window's budget (agent/4).
+
+### agent/15 — The agent's HTTP API for the frontend: chat, tickets, meta
+
+**Status:** Decided (2026-11-01)
+
+- The frontend is its own service and calls the agent through its own server under `/api/*` (no CORS). One router per area in `siteops_agent/api/` (`chat.py`, `tickets.py`, `meta.py`, `health.py`, `triage.py`, `windows.py`), assembled in `app.py`.
+- **`POST /chat`**, stateless (agent/8): `{messages, since, until, draft_ticket}` → `{turn_id, answered, answer, citations, steps, pending_ticket, warnings, model, latency_ms}`.
+  - `messages` is the whole history, as plain role and content (`user` / `assistant`; the last is the user's; at most 40, 8000 characters each). `since` / `until` is the log range in view.
+  - Every `[n]` marker of `answer` is a `citations[].n`, enforced by the contract (`chat/base.py`): the engine drops failed citations with their markers. A runbook citation carries `quote_start` / `quote_end` inside `chunk_text`, so the frontend can highlight the quote; a log citation carries the lines seen around it, the cited one flagged.
+  - `steps` lists the tool calls; a search step carries its hits, flagged `cited`, which the "I don't know" card shows when `answered` is false.
+  - A service the turn can do without (rag) degrades it with a `warning`; one it needs (the model) fails it with 502, or 504 when slow.
+- **Tickets from chat: a signed draft, confirmed by the user.** On a `draft_ticket` turn the engine proposes a ticket built by code from checked judgement, as in triage (agent/10), and `pending_ticket` returns it for display with a `draft_token`: the whole `TicketCreate` and an expiry (30 minutes), signed with HMAC-SHA256 (`drafts.py`). `POST /tickets {draft_token}` verifies it and files it through the `TicketSink`, answering `CreateTicketResult` (`created: false` = already open, agent/3).
+  - **Why a token:** the browser can't edit what gets filed. If it sent the ticket back, the facts the code filled in (evidence text, window times) could be forged on the way. Signing keeps the agent stateless.
+  - The chat engine never files a ticket itself: only the user's confirmation does.
+- **`GET /meta`:** `{model, log_range: {earliest, latest}, range_presets, tickets_enabled}`, read once at startup; `tickets_enabled` is false when no tickets service is configured, and `POST /tickets` then answers 503.
+- **One error shape** for every route (`errors.py`): `{"detail", "code"}`, `code` stable for the frontend to branch on (`invalid_request` 422, `unauthorized` 401, `invalid_draft` 422, `queue_full` / `tickets_disabled` 503, `upstream_failed` 502, `upstream_timeout` 504, `run_not_found` 404).
+- **Not built:** `GET /runbooks/section` (it needs rag to return a chunk's neighbours, which the tool probe showed adds nothing for triage), streaming steps over SSE, per-user auth (agent/2).
+- **Cost:** the draft secret must be shared by every API process, or a draft signed by one fails on another; the API runs as one process (agent/8). A draft expires after 30 minutes and must be written again.
 
 ---
 
