@@ -13,7 +13,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 | Subject     | Category                                                                                                 | Decisions              |
 | ----------- | -------------------------------------------------------------------------------------------------------- | ---------------------- |
 | `scope`   | [1. Scope &amp; evaluation](#1-scope--evaluation)                                                         | scope/1 – scope/6     |
-| `arch`    | [2. Architecture &amp; service boundaries](#2-architecture--service-boundaries)                           | arch/1 – arch/11      |
+| `arch`    | [2. Architecture &amp; service boundaries](#2-architecture--service-boundaries)                           | arch/1 – arch/12      |
 | `design`  | [3. Code design &amp; dependency injection](#3-code-design--dependency-injection)                         | design/1 – design/4   |
 | `rag`     | [4. RAG pipeline: ingestion, retrieval &amp; generation](#4-rag-pipeline-ingestion-retrieval--generation) | rag/1 – rag/13        |
 | `agent`   | [5. Agent, access &amp; safety](#5-agent-access--safety)                                                  | agent/1 – agent/13    |
@@ -24,7 +24,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 | Priority                       | Decisions                                                                                                                                                                                                                                                                                              |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **P1 — before code**    | rag/5 embedding model · agent/2 access levels                                                                                                                                                                                              |
-| **P2 — while building** | rag/6 chunking · rag/8 reranker model · rag/9 "I don't know" rule · rag/10 citations · agent/5 auth · scope/4 golden set · scope/5 eval thresholds · arch/8 persistence · tooling/6 CI |
+| **P2 — while building** | rag/6 chunking · rag/8 reranker model · rag/9 "I don't know" rule · rag/10 citations · agent/5 auth · scope/4 golden set · scope/5 eval thresholds · arch/8 persistence · tooling/6 CI · arch/12 full compose stack |
 | **P3 — cut candidates** | rag/11 hybrid search · scope/6 LLM-judge metric · arch/9 distributed tracing · agent/6 scheduled triage · arch/10 backups                                                                                                                                                                          |
 
 ---
@@ -173,6 +173,15 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - Auth, rate limits, TLS, routing belong at the edge (API gateway), not duplicated per service.
 - Not built: one public entry point (agent `/chat`); scope stays on the AI components.
 - Next step: edge gateway (Envoy / Kong / Traefik) + LLM gateway (e.g. LiteLLM proxy) for per-user token budgets, model routing, fallback.
+
+### arch/12 — `docker compose up` gives a fully working environment
+
+**Status:** Open (2026-11-01) · **Priority:** P2
+
+- **Goal:** `docker compose up` alone (plus a `.env` with the secrets, design/4) starts everything `/ask` and `/triage` need, end to end, with no service run by hand.
+- **Today:** only `tickets` is in `docker-compose.yml`. rag's image reads `config.docker.yaml`, which assumes a `qdrant` service on the compose network and Ollama on the host at `host.docker.internal:11434`.
+- **To add:** `rag`, `qdrant` (with its volume, arch/8), the `ingest` job (`docker compose run ingest`, arch/5), `agent` once its container exists, and health checks with `depends_on` so services start in order.
+- **To decide:** Ollama in compose (self-contained, but a 27B model needs a GPU passed through) or on the host (`extra_hosts: host-gateway` on Linux); whether ingestion runs automatically on first start or stays a manual `run`.
 
 ---
 
