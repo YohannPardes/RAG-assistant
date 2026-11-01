@@ -6,7 +6,7 @@ the model never sees `TicketCreate`.
 """
 
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Set
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -29,7 +29,9 @@ class TicketDraft(_Decision):
     title: str = Field(min_length=1, max_length=200)
     summary: str = Field(min_length=1, max_length=4000, description="What happened, its impact, and why this diagnosis.")
     suggested_fix: str = Field(min_length=1, max_length=4000, description="Remediation steps for a human, from the cited runbook.")
-    evidence_lines: list[int] = Field(min_length=1, max_length=20, description="Numbers of the lines shown that show the fault.")
+    evidence_lines: list[int] = Field(
+        min_length=1, max_length=20, description="Numbers of the lines shown that prove the fault: at most 20, the clearest ones."
+    )
     runbook_chunk_id: str | None = Field(default=None, description="A chunk_id returned by search_runbooks, or null if none fits.")
 
 
@@ -40,14 +42,17 @@ class Dismissal(_Decision):
     looks_like: FaultType | None = Field(default=None, description="The fault it resembles, if any.")  # helps debug decoys
 
 
-def check_draft(draft: TicketDraft, shown: ShownLines, retrieved: Mapping[str, SearchHit]) -> list[str]:
+def check_draft(draft: TicketDraft, shown: ShownLines, retrieved: Mapping[str, SearchHit], known_hosts: Set[str]) -> list[str]:
     """What is wrong with the draft, written for the model to correct; empty when it can become a ticket.
 
     `shown` holds every line shown for this window (the window and any context, agent/14);
-    `retrieved` the hits of the searches made for it, by chunk_id.
+    `retrieved` the hits of the searches made for it, by chunk_id; `known_hosts` every host that wrote a line in
+    the run, so a service named in a message ("orders-db") can't pass for the server at fault.
     """
     problems = []
-    if not _host_shown(draft.host, shown):
+    if draft.host.strip().lower() not in {host.lower() for host in known_hosts}:
+        problems.append(f"host {draft.host!r} is not a server in these logs: name the server that is at fault")
+    elif not _host_shown(draft.host, shown):
         problems.append(f"host {draft.host!r} does not appear in the lines shown: name a host that does")
     if missing := [number for number in draft.evidence_lines if shown.event(number) is None]:
         problems.append(f"evidence_lines {missing} do not exist: the lines shown are 1 to {len(shown)}")
@@ -56,9 +61,9 @@ def check_draft(draft: TicketDraft, shown: ShownLines, retrieved: Mapping[str, S
     return problems
 
 
-def to_ticket_create(draft: TicketDraft, shown: ShownLines, retrieved: Mapping[str, SearchHit]) -> TicketCreate:
+def to_ticket_create(draft: TicketDraft, shown: ShownLines, retrieved: Mapping[str, SearchHit], known_hosts: Set[str]) -> TicketCreate:
     """The ticket for a checked draft: the model's judgement plus the facts, which code fills (agent/10)."""
-    if problems := check_draft(draft, shown, retrieved):
+    if problems := check_draft(draft, shown, retrieved, known_hosts):
         raise ValueError(f"the draft fails its checks: {problems}")
     numbers = list(dict.fromkeys(draft.evidence_lines))  # the model's order, each line once
     evidence = [_quote(event.raw) for number in numbers if (event := shown.event(number)) is not None]
