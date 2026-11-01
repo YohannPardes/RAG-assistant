@@ -7,6 +7,7 @@ dev = [                                          # `dev` is synced by default
     "ruff>=0.6",                                 # linter + formatter
     "mypy>=1.11",                                # static type checker
     "httpx>=0.28.1",
+    "types-regex>=2026.9.29.20261030",
 ]
 
 [tool.ruff]                                      # settings shared by lint and format

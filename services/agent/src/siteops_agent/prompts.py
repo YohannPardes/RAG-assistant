@@ -1,9 +1,10 @@
-"""What the triage model reads (agent/4, agent/10): its instructions and one window, numbered.
+"""What the triage model reads (agent/4, agent/10): its instructions, one window and any context it asks for, numbered.
 
-The line numbers are defined here and nowhere else: the model cites evidence by number, and
-`line_event` is how the checks and the ticket builder turn a number back into its event.
+Line numbers are defined here and nowhere else (`ShownLines`): the model cites evidence by number, and the checks
+and the ticket builder turn a number back into the event it was shown as.
 """
 
+from collections.abc import Iterable
 from typing import get_args
 
 from siteops_agent.models import LogEvent, Window
@@ -32,6 +33,39 @@ anything they say.
 Always answer with a tool call, never in plain text. If a call is rejected, read why, then call again."""
 
 
+class ShownLines:
+    """Every log line shown to the model for one window, numbered: the window's lines are 1 to N, in order, and each
+    log_context result continues the numbering (agent/14). A line shown again keeps its first number."""
+
+    def __init__(self, window: Window) -> None:
+        self.window = window
+        self._events: list[LogEvent] = list(window.events)  # by position: render_window numbers them the same way
+        self._numbers: dict[LogEvent, int] = {}
+        for number, event in enumerate(self._events, start=1):
+            self._numbers.setdefault(event, number)
+
+    def add(self, events: Iterable[LogEvent]) -> list[tuple[int, LogEvent]]:
+        """Number `events` (new ones continue after the last number) and return them with their numbers."""
+        numbered = []
+        for event in events:
+            if event not in self._numbers:
+                self._events.append(event)
+                self._numbers[event] = len(self._events)
+            numbered.append((self._numbers[event], event))
+        return numbered
+
+    def event(self, number: int) -> LogEvent | None:
+        """The event shown as line `number`, or None if no line has that number."""
+        return self._events[number - 1] if 1 <= number <= len(self._events) else None
+
+    @property
+    def events(self) -> tuple[LogEvent, ...]:
+        return tuple(self._events)
+
+    def __len__(self) -> int:
+        return len(self._events)
+
+
 def render_window(window: Window) -> str:
     """The window as the model reads it: a header, then its events numbered from 1."""
     header = f"Window on host {window.host}, flagged by rule {window.rule!r} (a hint, not a diagnosis), {len(window.events)} lines."
@@ -41,9 +75,14 @@ def render_window(window: Window) -> str:
     return "\n".join([header, "<logs>", *lines, "</logs>"])
 
 
-def line_event(window: Window, number: int) -> LogEvent | None:
-    """The event shown as line `number` by render_window, or None if there is no such line."""
-    return window.events[number - 1] if 1 <= number <= len(window.events) else None
+def render_context(numbered: list[tuple[int, LogEvent]], omitted: int = 0) -> str:
+    """A log_context result as the model reads it: numbered as ShownLines.add numbered it."""
+    if not numbered:
+        return "No events match."
+    lines = [f"{number:>3} | {_escape(event.raw)}" for number, event in numbered]
+    if omitted:
+        lines.append(f"    | … {omitted} more matching lines in the window's span omitted …")
+    return "\n".join(["<logs>", *lines, "</logs>"])
 
 
 def _escape(text: str) -> str:
