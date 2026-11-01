@@ -10,10 +10,12 @@ import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import ModuleType
+from typing import get_args
 
 import pytest
 
 from siteops_agent.log_parser.syslog import SyslogStyleParser
+from siteops_common.contracts import FaultType
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 SCRIPT = REPO_ROOT / "scripts" / "generate_logs.py"
@@ -111,6 +113,11 @@ def test_a_silenced_host_logs_no_normal_noise_during_its_fault(generated, fault_
     during = [message for t, _, line_host, _, message in lines if line_host == host and start <= t < end]
 
     assert not [message for message in during if forbidden in message]
+
+
+def test_every_seeded_fault_type_is_one_a_ticket_can_carry(generate_logs) -> None:
+    # the eval matches a ticket's fault_type to the ground truth's (scope/4): the two lists must agree
+    assert {f.fault_type for f in generate_logs.FAULTS} == set(get_args(FaultType)) - {"other"}
 
 
 def test_every_expected_runbook_is_a_runbook_of_the_corpus(generate_logs) -> None:

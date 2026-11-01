@@ -16,7 +16,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 | `arch`    | [2. Architecture &amp; service boundaries](#2-architecture--service-boundaries)                           | arch/1 – arch/11      |
 | `design`  | [3. Code design &amp; dependency injection](#3-code-design--dependency-injection)                         | design/1 – design/4   |
 | `rag`     | [4. RAG pipeline: ingestion, retrieval &amp; generation](#4-rag-pipeline-ingestion-retrieval--generation) | rag/1 – rag/13        |
-| `agent`   | [5. Agent, access &amp; safety](#5-agent-access--safety)                                                  | agent/1 – agent/9     |
+| `agent`   | [5. Agent, access &amp; safety](#5-agent-access--safety)                                                  | agent/1 – agent/10    |
 | `tooling` | [6. Tooling, packaging &amp; testing](#6-tooling-packaging--testing)                                      | tooling/1 – tooling/6 |
 
 ## Open decisions by priority
@@ -24,7 +24,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 | Priority                       | Decisions                                                                                                                                                                                                                                                                                              |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **P1 — before code**    | rag/5 embedding model · agent/2 access levels                                                                                                                                                                                              |
-| **P2 — while building** | rag/6 chunking · rag/7 retrieval depth · rag/8 reranker model · rag/9 "I don't know" rule · rag/10 citations · agent/3 ticket fingerprint · agent/4 agent loop · agent/5 auth · scope/4 golden set · scope/5 eval thresholds · arch/7 timeouts/retries · arch/8 persistence · tooling/6 CI |
+| **P2 — while building** | rag/6 chunking · rag/7 retrieval depth · rag/8 reranker model · rag/9 "I don't know" rule · rag/10 citations · agent/4 agent loop · agent/5 auth · scope/4 golden set · scope/5 eval thresholds · arch/7 timeouts/retries · arch/8 persistence · tooling/6 CI |
 | **P3 — cut candidates** | rag/11 hybrid search · scope/6 LLM-judge metric · arch/9 distributed tracing · agent/6 scheduled triage · arch/10 backups                                                                                                                                                                          |
 
 ---
@@ -310,9 +310,13 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 
 ### agent/3 — Ticket fingerprint and dedup window
 
-**Status:** Open · **Priority:** P2
+**Status:** Decided (2026-11-01)
 
 - Which fields define "the same fault" (agent/1), and for how long a duplicate is suppressed.
+- **Decision:** fingerprint = `(fault_type, host)` of the `TicketCreate` (agent/10). A ticket whose fingerprint matches one created in the last **60 minutes** is not stored: `create_ticket` returns the existing ticket with `created=False`.
+- **Enforced by the tickets service**, not the agent: it is the boundary a prompt-injected agent can't get around (agent/1). The agent's in-memory ticket sink applies the same rule, so its tests see the same behaviour.
+- **Why:** a fault keeps logging for its whole duration and can open several windows (on one host, or on each affected host), each ending in a ticket attempt; one ticket per fault and host is what an on-call engineer wants. A retried `create_ticket` is then harmless too (arch/7).
+- **Cost:** two different faults of the same type on the same host within an hour become one ticket. Symptoms of one fault on several hosts still give one ticket per host; scope/4 counts those as duplicates, and naming the root host (agent/10's `host`) is how the agent avoids them.
 
 ### agent/4 — Agent loop: implementation and limits
 
@@ -372,6 +376,18 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - **Why:** cost (the LLM sees a few windows, not 10,000 lines); testability (rules have exact, fast tests, only the diagnosis is left to the LLM); security (most untrusted log text never reaches the model, agent/1).
 - **Cost:** triage recall is capped by the prefilter: a fault no rule matches and that logs no ERROR is invisible. That is why recall is measured end to end (scope/4).
 - **Known limitation:** a host that goes silent produces no window. Detecting a *missing* signal needs another kind of detector (a scan over time per host, not a check per event); it is the next rule type, not built. `pg_primary_down` is caught through its symptoms on other hosts instead, and scope/4's `affected_hosts` makes that count.
+
+### agent/10 — Ticket contract
+
+**Status:** Decided (2026-11-01)
+
+- In `common` (arch/4): `FaultType`, `TicketCreate` (what the agent sends), `Ticket` (plus `id`, `created_at`, `fingerprint`, set by the tickets service) and `CreateTicketResult` (`created=False` = deduplicated, agent/3).
+- `FaultType` = the seven seeded faults (scope/2) + `"other"`. One list for the agent's prompt, the tickets service and the eval (scope/4); a test checks it matches the generator's.
+- `TicketCreate`: `fault_type`, `host` (root cause, may differ from the window's host), `severity` (SEV-1..3, the runbooks' scale), `title`, `summary` (incident report), **`suggested_fix`** (the agent's proposed remediation), `evidence` (raw log lines), `runbook` (chunk_id, source, heading path; `None` when none fits), `window_start` / `window_end` (timezone-aware, in order).
+- **`suggested_fix` is advice for a human, never executed** by any service. It is written by an agent that reads untrusted logs, so an injected log line could steer it ("run rm -rf …"): the agent loop (agent/4) should ground it in the cited runbook, and readers must treat it as unverified.
+- Every text field and list is bounded (title 200, summary and fix 4000, 1–20 evidence lines of ≤2000 chars): limits what a prompt-injected agent can write.
+- **Why:** `fault_type` is chosen by the agent, not inferred from its citation, so the eval scores diagnosis and citation separately (scope/4). `runbook` is optional because a forced citation would be an invented one.
+- **Cost:** adding a fault type means changing `common`, hence rebuilding every image (arch/4). The fingerprint's composition is agent/3's, still open: the contract only carries it.
 
 ---
 

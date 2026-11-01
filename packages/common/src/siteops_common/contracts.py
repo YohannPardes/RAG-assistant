@@ -1,6 +1,8 @@
 """Wire contracts shared between services (arch/4). Pydantic models only, no logic."""
 
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Annotated, Literal, Self
+
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
 
 class _Contract(BaseModel):
@@ -68,3 +70,71 @@ class AskResponse(_Contract):
     model: str  # the LLM that answered (rag/4)
     embedding_model: str
     latency_ms: float  # time spent serving the request, retrieval and generation included
+
+
+# tickets: MCP tool create_ticket (arch/6)
+
+# What the agent may diagnose: the seeded faults (scope/2) and "other" for a real problem none of them fits.
+# One list for the agent's prompt, the tickets service and the eval's matching rule (scope/4).
+FaultType = Literal[
+    "disk_full",
+    "pg_primary_down",
+    "pg_replica_lag",
+    "cert_expiry",
+    "high_latency",
+    "api_error_rate",
+    "pod_oomkilled",
+    "other",
+]
+
+Severity = Literal["SEV-1", "SEV-2", "SEV-3"]  # the runbooks' scale: SEV-1 is the worst
+
+EvidenceLine = Annotated[str, Field(min_length=1, max_length=2000)]
+
+
+class RunbookRef(_Contract):
+    """The runbook section a ticket relies on: a chunk rag /search returned to the agent."""
+
+    chunk_id: str = Field(min_length=1)  # lets the agent check it really was retrieved
+    source: str = Field(min_length=1)  # e.g. "runbook_disk_full.pdf": the eval compares it to `expected_runbook`
+    heading_path: list[str]
+
+
+class TicketCreate(_Contract):
+    """An incident the agent asks to open.
+
+    Every text field is bounded: the agent writes them from untrusted logs (agent/1), so a prompt-injected
+    agent can't fill the store or a reader's screen.
+    """
+
+    fault_type: FaultType
+    host: str = Field(min_length=1, max_length=255)  # the root cause, which may not be the host the symptoms came from
+    severity: Severity
+    title: str = Field(min_length=1, max_length=200)
+    summary: str = Field(min_length=1, max_length=4000)  # the incident report: what happened, impact, why this diagnosis
+    suggested_fix: str = Field(min_length=1, max_length=4000)  # the agent's proposed remediation, for a human to apply: never executed
+    evidence: list[EvidenceLine] = Field(min_length=1, max_length=20)  # raw log lines, quoted unchanged
+    runbook: RunbookRef | None = None  # None when no runbook fits, e.g. fault_type "other"
+    window_start: AwareDatetime  # the prefilter window the diagnosis comes from
+    window_end: AwareDatetime
+
+    @model_validator(mode="after")
+    def _window_in_order(self) -> Self:
+        if self.window_end < self.window_start:
+            raise ValueError("window_end is before window_start")
+        return self
+
+
+class Ticket(TicketCreate):
+    """A stored ticket: what the agent sent, plus what the tickets service added."""
+
+    id: str = Field(min_length=1)
+    created_at: AwareDatetime
+    fingerprint: str = Field(min_length=1)  # "the same fault": tickets with one fingerprint are deduplicated (agent/3)
+
+
+class CreateTicketResult(_Contract):
+    """The reply to create_ticket: the stored ticket, new or the one it duplicates."""
+
+    ticket: Ticket
+    created: bool  # False = deduplicated: a ticket with this fingerprint is still within the dedup window (agent/3)
