@@ -37,6 +37,7 @@ _EXTENSIONS = {
     "application/pdf": ".pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
     "text/markdown": ".md",
+    "text/html": ".html",
 }
 
 
@@ -54,7 +55,7 @@ class DoclingDocumentConverter(AbstractDocumentConverter):
         # keep each PDF page's text lines: Docling joins the lines of a code block or a list, they split them again
         pdf = PdfFormatOption(pipeline_options=PdfPipelineOptions(generate_parsed_pages=True))
         self.converter = DocumentConverter(
-            allowed_formats=[InputFormat.PDF, InputFormat.DOCX, InputFormat.MD],
+            allowed_formats=[InputFormat.PDF, InputFormat.DOCX, InputFormat.MD, InputFormat.HTML],
             format_options={InputFormat.PDF: pdf},
         )
         self.text_converter = TextMarkdownConverter()
