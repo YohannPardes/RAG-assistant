@@ -49,6 +49,8 @@ def test_the_only_tool_is_create_ticket_with_the_contract_schema(server) -> None
     assert [tool.name for tool in tools] == ["create_ticket"]
     # generated from TicketCreate (arch/4): the agent's LLM sees every field, the suggested fix included
     assert "suggested_fix" in str(tools[0].input_schema) and tools[0].output_schema
+    # the description is the method's docstring, without its source indentation
+    assert tools[0].description.startswith("Open an incident ticket") and "\n " not in tools[0].description
 
 
 def test_create_ticket_returns_the_stored_ticket_then_deduplicates(server, ticket_payload) -> None:

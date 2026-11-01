@@ -1,23 +1,29 @@
-"""What the tickets MCP server offers: every tool lives here. Adding a tool = one more function in `register_tools`.
+"""Every tool the tickets MCP server offers. Adding a tool = one method + its name in `register`."""
 
-Each description is what an LLM reads to decide *when* to call the tool, so it says that, not just what the tool does.
-Input and output schemas come from the `common` contracts (arch/4).
-"""
+import inspect
 
 from mcp.server.mcpserver import MCPServer
 
 from siteops_common.contracts import CreateTicketResult, TicketCreate
 from siteops_tickets.store import TicketStore
 
-CREATE_TICKET_DESCRIPTION = (
-    "Open an incident ticket for a confirmed fault that needs human action. "
-    "A ticket with the same fault type and host as one opened within the dedup window is not stored again: "
-    "that ticket comes back, with created=false."
-)
 
+class TicketTools:
+    """The server's tools"""
 
-def register_tools(server: MCPServer, store: TicketStore) -> None:
-    @server.tool(description=CREATE_TICKET_DESCRIPTION)
-    def create_ticket(ticket: TicketCreate) -> CreateTicketResult:
+    def __init__(self, store: TicketStore) -> None:
+        self._store = store
+
+    def create_ticket(self, ticket: TicketCreate) -> CreateTicketResult:
+        """Open an incident ticket for a confirmed fault that needs human action.
+
+        A report with the same fault type and host as a ticket opened within the dedup window
+        does not create a new one: that ticket is returned, with created=false.
+        """
         # sync: the SDK runs it in a worker thread, so the SQLite write never blocks the event loop
-        return store.create(ticket)
+        return self._store.create(ticket)
+
+    def register(self, server: MCPServer) -> None:
+        for tool in (self.create_ticket,):
+            # the SDK would send the raw docstring, indentation included: the LLM reads the cleaned text
+            server.add_tool(tool, description=inspect.cleandoc(tool.__doc__ or ""))

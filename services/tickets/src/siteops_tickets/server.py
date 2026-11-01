@@ -16,13 +16,13 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from siteops_tickets.config import Settings
 from siteops_tickets.store import TicketStore
-from siteops_tickets.tools import register_tools
+from siteops_tickets.tools import TicketTools
 
 
 def build_server(store: TicketStore) -> MCPServer:
     """The MCP server: the tools of tools.py, plus /health."""
     server = MCPServer("siteops-tickets", instructions="Opens deduplicated incident tickets.")
-    register_tools(server, store)
+    TicketTools(store).register(server)
 
     @server.custom_route("/health", methods=["GET"])  # type: ignore[untyped-decorator]  # the SDK leaves it untyped
     async def health(request: Request) -> Response:
