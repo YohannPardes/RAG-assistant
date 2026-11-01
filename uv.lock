@@ -3465,6 +3465,10 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+api = [
+    { name = "fastapi" },
+    { name = "uvicorn" },
+]
 http = [
     { name = "httpx" },
 ]
@@ -3477,6 +3481,7 @@ openai-compat = [
 
 [package.metadata]
 requires-dist = [
+    { name = "fastapi", marker = "extra == 'api'", specifier = ">=0.162.0" },
     { name = "httpx", marker = "extra == 'http'", specifier = ">=0.28.1" },
     { name = "langchain-core", specifier = ">=1.7.3" },
     { name = "langchain-openai", marker = "extra == 'openai-compat'", specifier = ">=1.7.3" },
@@ -3486,8 +3491,9 @@ requires-dist = [
     { name = "pydantic-settings", extras = ["yaml"], specifier = ">=2.16.1" },
     { name = "regex", specifier = ">=2026.9.29" },
     { name = "siteops-common", editable = "packages/common" },
+    { name = "uvicorn", marker = "extra == 'api'", specifier = ">=0.54.0" },
 ]
-provides-extras = ["openai-compat", "mcp", "http"]
+provides-extras = ["openai-compat", "mcp", "http", "api"]
 
 [[package]]
 name = "siteops-common"

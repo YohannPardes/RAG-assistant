@@ -73,7 +73,8 @@ rag_project/
 ├── services/agent/
 │   ├── pyproject.toml   Dockerfile   config.yaml   .env.example
 │   ├── src/siteops_agent/
-│   │   ├── api.py              ENTRY   /triage
+│   │   ├── api.py              ENTRY   POST /triage (202, a run in the background), GET /triage[/{run_id}], GET /windows (agent/8)
+│   │   ├── runs.py             CORE    TriageRuns: one run at a time in a worker thread, the last 50 kept in memory
 │   │   ├── cli.py              ENTRY   for a scheduler
 │   │   ├── container.py  config.py   ROOT
 │   │   ├── agent.py            FLOW    the window's LangGraph StateGraph: diagnose ⇄ tools until create_ticket or dismiss (agent/4)
@@ -93,7 +94,7 @@ rag_project/
 │           ├── conftest.py              generate_logs (the generator script, loaded from its path), a window and its search hits
 │           ├── test_generated_logs.py   scripts/generate_logs.py: determinism, fault windows, decoys, ground truth, every line parses
 │           ├── test_models.py           LogEvent / Window: frozen and hashable, Window.id
-│           ├── test_prompts.py  test_decision.py  test_report.py  test_config.py  test_log_context.py
+│           ├── test_prompts.py  test_decision.py  test_report.py  test_config.py  test_log_context.py  test_runs.py  test_api.py
 │           ├── test_prefilter.py        matching, merging, thresholds, context, cap, order; agent/12's recall on generated logs
 │           ├── log_parser/test_syslog.py
 │           ├── log_source/          test_base.py (contract suite: memory + file)  test_file.py

@@ -59,3 +59,21 @@ def test_a_secret_in_the_yaml_is_an_error(isolated_env) -> None:
 def test_no_key_is_an_error() -> None:
     with pytest.raises(ValidationError):
         Settings(_env_file=None)  # type: ignore[call-arg]
+
+
+def test_the_api_key_is_optional_so_the_cli_runs_without_it(monkeypatch) -> None:
+    monkeypatch.setenv("AGENT_TICKETS__API_KEY", API_KEY)
+
+    settings = Settings(_env_file=None)  # type: ignore[call-arg]
+
+    assert settings.api.api_key is None and settings.api.port == 8001
+
+
+def test_the_api_key_comes_from_the_environment_and_must_be_long_enough(monkeypatch) -> None:
+    monkeypatch.setenv("AGENT_TICKETS__API_KEY", API_KEY)
+    monkeypatch.setenv("AGENT_API__API_KEY", "agent-key-0123456789")
+    assert Settings(_env_file=None).api.api_key.get_secret_value() == "agent-key-0123456789"  # type: ignore[call-arg, union-attr]
+
+    monkeypatch.setenv("AGENT_API__API_KEY", "short")
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)  # type: ignore[call-arg]

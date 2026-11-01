@@ -389,6 +389,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - **Recommendation (implemented in the tickets service):** one shared key, `TICKETS_API_KEY`, from the environment (compose takes it from the shell or a git-ignored `.env`), at least 16 characters; the service refuses to start without it. Clients send `Authorization: Bearer <key>`; an ASGI middleware compares it in constant time (`hmac.compare_digest`) and answers 401 otherwise. `/health` needs no key. The port is published on 127.0.0.1 only.
 - **Why:** the only client is the agent, inside the compose network; per-client keys, rotation and scopes belong at the edge (arch/11).
 - **Cost:** one key for every client: no per-client revocation or audit of who opened a ticket. Rotating it means restarting the service and the agent.
+- **The agent's API (2026-11-01)** uses the same scheme: `AGENT_API__API_KEY` (a secret, design/4), `Authorization: Bearer`, compared in constant time, `/health` exempt. Only `api.py` needs it, so the setting is optional and the CLI runs without it; the API refuses to start without one.
 
 ### agent/6 — Scheduled / watcher-triggered triage
 
@@ -417,6 +418,12 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - **Why:** triage is measurable (seeded faults → precision/recall); chat has no ground truth yet, and adds user text as a second untrusted input to prompt-harden and test. Time budget before the interview goes to the measurable mode.
 - **Next step:** `/chat` = the same agent factory with a chat system prompt and the conversation history from the client (stateless). Tools, rag and tickets unchanged.
 - rag `/ask` remains the direct Q&A endpoint for users meanwhile.
+- **Amended (2026-11-01), `POST /triage` is in scope:** the agent's HTTP API (`api.py`) runs the same job as the CLI.
+  - A run takes minutes, so `POST /triage {since, until, dry_run}` starts it in a worker thread and answers `202 {run_id}` at once; `GET /triage/{run_id}` returns its state (`running`, `done` with the `TriageReport`, `failed` with the error) and `GET /triage` the recent runs.
+  - **One run at a time** (one model server, traces in order): a second `POST` while one runs gets `409`. The same range submitted twice is two runs; the tickets service's dedup (agent/3) keeps the second from filing duplicates.
+  - `GET /windows?since&until` previews the prefilter's windows (counts, no log text, no LLM): the debugging entry point.
+  - Runs are kept in memory (the last 50): a restart forgets them, not their tickets. Writing reports to a volume is arch/8's, not done.
+  - Routes only: the work is `TriageRuns` (`runs.py`) and the job built by `container.py`; handlers are plain `def`, so the synchronous graph and the MCP sink's own event loop run off the server's loop.
 
 ### agent/9 — Log parser and prefilter: contract
 
