@@ -1,15 +1,13 @@
 """scripts/generate_logs.py: the triage eval's input and ground truth (scope/2, scope/4), and its agreement with the parser.
 
-The script is not a package: load it from its path.
+The script is loaded by conftest.py.
 """
 
-import importlib.util
 import json
 import random
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from types import ModuleType
 from typing import get_args
 
 import pytest
@@ -18,18 +16,8 @@ from siteops_agent.log_parser.syslog import SyslogStyleParser
 from siteops_common.contracts import FaultType
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
-SCRIPT = REPO_ROOT / "scripts" / "generate_logs.py"
 START = datetime(2026, 11, 1, 6, tzinfo=UTC)
 HOURS = 4
-
-
-@pytest.fixture(scope="module")
-def generate_logs() -> ModuleType:
-    spec = importlib.util.spec_from_file_location("generate_logs", SCRIPT)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
 
 
 @pytest.fixture(scope="module")

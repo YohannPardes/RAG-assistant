@@ -16,7 +16,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 | `arch`    | [2. Architecture &amp; service boundaries](#2-architecture--service-boundaries)                           | arch/1 – arch/11      |
 | `design`  | [3. Code design &amp; dependency injection](#3-code-design--dependency-injection)                         | design/1 – design/4   |
 | `rag`     | [4. RAG pipeline: ingestion, retrieval &amp; generation](#4-rag-pipeline-ingestion-retrieval--generation) | rag/1 – rag/13        |
-| `agent`   | [5. Agent, access &amp; safety](#5-agent-access--safety)                                                  | agent/1 – agent/10    |
+| `agent`   | [5. Agent, access &amp; safety](#5-agent-access--safety)                                                  | agent/1 – agent/13    |
 | `tooling` | [6. Tooling, packaging &amp; testing](#6-tooling-packaging--testing)                                      | tooling/1 – tooling/6 |
 
 ## Open decisions by priority
@@ -24,7 +24,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 | Priority                       | Decisions                                                                                                                                                                                                                                                                                              |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **P1 — before code**    | rag/5 embedding model · agent/2 access levels                                                                                                                                                                                              |
-| **P2 — while building** | rag/6 chunking · rag/7 retrieval depth · rag/8 reranker model · rag/9 "I don't know" rule · rag/10 citations · agent/4 agent loop · agent/5 auth · scope/4 golden set · scope/5 eval thresholds · arch/7 timeouts/retries · arch/8 persistence · tooling/6 CI |
+| **P2 — while building** | rag/6 chunking · rag/7 retrieval depth · rag/8 reranker model · rag/9 "I don't know" rule · rag/10 citations · agent/5 auth · scope/4 golden set · scope/5 eval thresholds · arch/8 persistence · tooling/6 CI |
 | **P3 — cut candidates** | rag/11 hybrid search · scope/6 LLM-judge metric · arch/9 distributed tracing · agent/6 scheduled triage · arch/10 backups                                                                                                                                                                          |
 
 ---
@@ -110,6 +110,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - **Mechanism:** uv workspace. Layout: `packages/common/src/common/`, `services/rag/src/site_ops/`, `services/tickets/src/tickets/`; each member has its own `pyproject.toml`. Root `pyproject.toml` with `[tool.uv.workspace]`, one shared `uv.lock`. Services depend on `common` via `[tool.uv.sources] common = { workspace = true }`.
 - Docker: each image copies `common` + its own service, `uv sync --package <service>`; build context = repo root.
 - MCP tool schemas are generated from `common` pydantic models (single source of truth for the wire format).
+- **Amended (2026-11-01):** contracts may include **pure helpers that define a shared identity**, so two services can't disagree on it. First case: `fingerprint(fault_type, host)` (agent/3), used by the tickets store and the agent's in-memory ticket sink.
 
 ### arch/5 — Which of my own modules become separate services
 
@@ -134,9 +135,15 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 
 ### arch/7 — Timeout and retry policy for network calls
 
-**Status:** Open · **Priority:** P2
+**Status:** Decided (2026-11-01)
 
 - Per-call timeouts, which calls retry (idempotent only?), backoff. Answers arch/1's cost line.
+- **Decision (the agent's clients):**
+  - rag client: 10 s timeout, 2 retries on connection errors (`/search` is read-only).
+  - MCP ticket sink: 10 s timeout, 2 retries on connection errors; safe because `create_ticket` is deduplicated by the server (agent/3).
+  - model client: 120 s timeout, no retries (a slow model call is retried by nobody; the window ends unresolved).
+- **Why:** simple fixed values; only calls that are safe to repeat are retried.
+- **Cost:** no backoff tuning or circuit breaker; a rag outage makes every window of a run slow to fail.
 
 ### arch/8 — Persistence: Docker volumes for Qdrant and SQLite
 
@@ -178,6 +185,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - Own pure logic (chunker, log parser, prefilter) stays concrete — nothing to swap.
 - **Why:** no component depends on a single technology; tests run on fakes/in-memory adapters.
 - **Cost:** more files; each interface must have ≥2 implementations (one real, one fake) to justify existing. This rule is what stops speculative interfaces; it also keeps implementation details from leaking into the interface and makes testing easy.
+- **Amended (2026-11-01): a framework's own abstraction counts as the interface.** When a framework we adopt already ships an interface with real and fake implementations, we use it instead of wrapping it in our own ABC. First case: the agent's chat model is LangChain's `BaseChatModel` (agent/4); production uses its OpenAI-compatible / Ollama implementation, tests use `langchain_core`'s fake chat models. The agent has no `llm/` package. The rag service keeps its own `llm/` ABC, since it uses no framework.
 
 ### design/2 — Interfaces via `abc.ABC` (not `typing.Protocol`)
 
@@ -300,7 +308,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 
 ### agent/1 — Agent design: single agent + deterministic pre-filter; logs are untrusted
 
-**Status:** Proposed
+**Status:** Decided (2026-11-01)
 
 - Regex/threshold pre-filter flags windows; LLM reasons only on flagged windows.
 - Agent's only side effect is `create_ticket`, deduplicated by fault fingerprint (prompt-injection blast radius).
@@ -323,9 +331,19 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 
 ### agent/4 — Agent loop: implementation and limits
 
-**Status:** Open · **Priority:** P2
+**Status:** Decided (2026-11-01)
 
 - Hand-written loop vs framework; max steps, tool-call budget, timeout.
+- **Decision:** triage is a **LangGraph `StateGraph`**: a workflow, not an open agent. Code fixes the steps (read logs → parse → prefilter → for each window: diagnose → decide → validate → act → report); the LLM is called only inside a window, with a narrow tool set (`search_runbooks`, the narrow `create_ticket` and `dismiss` of agent/10), and every window ends in a ticket or a dismissal.
+- **Amended (2026-11-01): only the per-window loop is a graph.** The run (read → parse → prefilter → each window in turn → report) is plain sequential Python with no decision in it, so it stays framework-free and testable without LangGraph; it receives the per-window step as a callable. The one `StateGraph` is the window's: `diagnose ⇄ tools` until `create_ticket` or `dismiss` succeeds. Windows are processed one at a time.
+- **Before building it:** check that the model calls tools reliably (two or three real windows through `bind_tools`, thinking off): `search_runbooks`, then `create_ticket` or `dismiss`, with valid arguments. If it often answers in plain text, the window ends with a structured-output `decide` step instead of terminal tools.
+  - **Result (2026-11-01): terminal tools kept.** qwen3.5:27b on Ollama, thinking off, temperature 0, real retrieval, 4 hand-built seed-42 windows (high_latency, pg_primary_down seen from the replica, pod_oomkilled, the ERROR 504 decoy) × 2 runs: 8/8 as expected, every step a tool call, no invalid arguments, the same result on both runs, 4–24 s per window. It named the root host (`db-primary-01`) from the replica's lines and dismissed the decoy. One wrong citation: high_latency cited `runbook_search_latency.txt` after a third search, though its first search returned `runbook_high_latency.txt`. Citation quality is for the eval (scope/4), not a reason to change the loop.
+- **Repeatability:** temperature 0 and a fixed seed make runs *more* repeatable, not deterministic (GPU inference still varies). Idempotency comes from the fixed `[since, until)` range and the server's dedup (agent/3), not from the model.
+- The model is LangChain's `BaseChatModel` (design/1, amended); tests use `langchain_core`'s fake chat models.
+- Tools are written once, as LangChain tools, so the chat agent (agent/11) can reuse them later.
+- **Limits:** `max_steps_per_window` (graph recursion limit) and `max_searches_per_window`; a window that exhausts its budget is reported as unresolved, never ticketed. The values are set when the graph is built. A cap on LLM calls per run and a per-window timeout are added only if a run misbehaves.
+- **Why:** triage must be predictable and measurable (scope/4): the LLM fills structured fields, code decides what happens next. LangGraph gives the per-window loop, the recursion limit and tracing without hand-writing them, and is a common industry choice.
+- **Cost:** a framework dependency in the agent image and its abstractions to learn; the loop's behaviour is partly the framework's, so its version is pinned and the graph is tested on fake models.
 
 ### agent/5 — Auth for the API and the MCP server
 
@@ -341,6 +359,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 **Status:** Open · **Priority:** P3 (cut candidate)
 
 - On-demand `/triage` only vs a scheduler or log watcher.
+- **Note (2026-11-01):** there is no checkpoint store ("last run went up to here"). A run takes an explicit `[since, until)` range and relies on the server's dedup (agent/3) for overlaps; a saved checkpoint belongs here, with the scheduler.
 
 ### agent/7 — RAG and agent are separate services
 
@@ -397,8 +416,56 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
   - **code checks** that `host` appears in the window's events (it may be the root cause, not the symptom host, scope/4), that every line number exists and the chunk_id was retrieved; a failed check goes back to the model as a tool error;
   - **code fills** the facts: window times, evidence text (the events' `raw`), the full `RunbookRef` from the retrieved hit; then it calls the MCP tool through a plain `mcp` client session (no MCP-to-LLM adapter).
   - The narrow tool's description is the agent's (e.g. "use `dismiss` for transient or harmless events"); the MCP tool's description doesn't name agent tools, since any client may call it.
+- **Rejected (2026-11-01): code fixes `host` to the window's host and `fault_type` to the window's rule.** It would take dedup out of the model's hands, but a rule is only a hint (agent/9) and a fault's symptoms show up on other hosts: `pg_primary_down` would give one ticket per symptom host (agent/3, scope/4). The model's reach stays bounded instead: `host` must appear in the window, `fault_type` is one of the `FaultType` values, and the eval counts duplicates.
 - **Why:** `fault_type` is chosen by the agent, not inferred from its citation, so the eval scores diagnosis and citation separately (scope/4). `runbook` is optional because a forced citation would be an invented one.
 - **Cost:** adding a fault type means changing `common`, hence rebuilding every image (arch/4). The fingerprint's composition is agent/3's, still open: the contract only carries it.
+
+### agent/11 — Chat agent: LangChain `create_agent`
+
+**Status:** Proposed
+
+- For `/chat`, deferred by agent/8: nothing of it is built in this version.
+- **Recommendation:** an open tool-calling agent, LangChain's `create_agent`, on the same model and the same tools as triage (agent/4), with its own system prompt and limits. Its tools are read-only by default (`search_runbooks`, a bounded log query, a ticket lookup); creating a ticket from chat would need the user's confirmation (human-in-the-loop interrupt). Conversation history comes from the client (stateless, agent/8).
+- **Why:** user questions have no fixed path, so the model chooses the tools; triage's guarantees come from its graph, which chat doesn't need.
+- **Cost:** user text is a second untrusted input (agent/8); who may ask what depends on agent/2.
+
+### agent/12 — Prefilter rules
+
+**Status:** Decided (2026-11-01)
+
+- The rules `find_windows` (agent/9) runs on, in this order; an event goes to the first rule whose component, level and pattern match it (a threshold rule consumes the event even when its count is never reached).
+- **One shape:** `Rule(name, pattern, components=None, min_level, min_count=1, within)`. A pattern rule is `min_count=1`; a threshold rule fires when `min_count` matches fall within `within`.
+
+| # | Rule | Component · level · message pattern | `min_count` / `within` | Seeded fault (scope/2) |
+|---|---|---|---|---|
+| 1 | `db_leader_unreachable` | `patroni` · WARN+ · `unreachable\|Connection refused\|no automatic failover` | 1 / 10 min | pg_primary_down (replica) |
+| 2 | `db_write_failed` | `public-api` · ERROR+ · `write failed\|recovery mode` | 1 / 5 min | pg_primary_down (API hosts) |
+| 3 | `tls_certificate` | any · WARN+ · `certificate has expired\|x509\|SSL_do_handshake\(\) failed\|renewal failed` | 1 / 10 min | cert_expiry |
+| 4 | `disk_pressure` | any · WARN+ · `usage (8[5-9]\|9\d\|100)%\|No space left on device` | 1 / 10 min | disk_full |
+| 5 | `pod_crashloop` | `kubelet` · WARN+ · `OOMKilled\|CrashLoopBackOff` | 1 / 10 min | pod_oomkilled |
+| 6 | `replica_lag` | `pg-monitor` · WARN+ · `replica lag` | 3 / 5 min | pg_replica_lag |
+| 7 | `slow_requests` | `public-api` · WARN+ · `^\S+ \S+ \d{3} \d+ms$` (an access line: a 504 timeout has another shape) | 5 / 5 min | high_latency |
+| 8 | `http_5xx` | `public-api` · ERROR+ · `\s50[0-3]\s` | 3 / 5 min | api_error_rate |
+| 9 | `unknown` | any · ERROR+ · anything | 1 / 5 min | catch-all |
+
+- **Principles:** one rule per symptom family, so a fault opens one window per host (fewer LLM calls); specific before generic (`db_write_failed` before `http_5xx`); thresholds where one line means nothing, patterns where one line is already a fault; a 10-minute `within` for faults that repeat slowly (OOMKill back-off up to 5 min, renewal failures every 5 min).
+- **Implemented** in `prefilter.py` as `RULES`; a test runs them on the generator's logs (seeds 1, 7, 42): every fault gets a window from its rule, and outside the faults only the ERROR 504 decoy opens one (seed 42: 13 windows, 4 of them pg_primary_down's, 2 cert_expiry's).
+- **Decoys:** the 1450 ms request, the 22 MB lag line, `log-01` at 81 %, the kubelet `exitCode=1` restart and the retried probe give no window; the ERROR 504 gives an `unknown` window for the agent to dismiss (504 is kept out of `slow_requests` and `http_5xx` for that).
+- **Why:** each seeded fault is caught by a named rule, so the rule is a useful hint (agent/9) and prefilter recall is 1 on the generator's logs, which a unit test can check without an LLM.
+- **Cost:** tuned to the generator's lines (they read as ordinary SRE alerts, but a new fault needs a new rule); end-to-end recall (scope/4) keeps that honest. The API hosts' pg_primary_down lines never name `db-primary-01`, and the probe's cert_expiry lines never name `ingress-01`: those windows can only ticket the symptom host, which scope/4 matches but counts as a duplicate.
+
+### agent/13 — Log source: one contract, whatever the source
+
+**Status:** Decided (2026-11-01)
+
+- `LogSource.read(since, until) -> LogBatch(events, unparsable)`: a source gives **`LogEvent`s**, not lines, so nothing downstream (prefilter, agent, report) knows where the logs came from. A text source (file, HTTP stream) composes a `LogParser` (agent/9); a structured one (database rows) builds the events itself and needs no parser.
+- **Guarantees, stated once in the ABC** (`read` is concrete, subclasses implement `_read`, as in `LogParser`): only events with `since <= time < until`; time order, ties in the source's order; `since` and `until` must be timezone-aware and in order, else `ValueError`.
+- **A closed range, never "until now":** the same range read twice gives the same batch, which makes a triage run repeatable (agent/4). Following a live stream is the watcher's job (agent/6), a different method when it is built.
+- `_read` may return events outside the range (`read` drops them), so a source that can't filter by time doesn't have to; one that can (a `WHERE time >= …` query) should, to read less.
+- `unparsable` counts the records read that gave no event, whatever their time (an unparsable line has none); it goes in the triage report.
+- **Adapters (design/1):** `FileLogSource(path, parser=SyslogStyleParser())`, UTF-8 with undecodable bytes replaced, a missing file is an error (configuration, not an empty log); `MemoryLogSource(events, unparsable=0)` is the fake. One contract suite runs on both (tooling/5).
+- **Why:** sources differ in transport and format, not in what triage needs: events in a time range, plus a count of what couldn't be read.
+- **Cost:** a file is parsed whole on every read (fine for hours of logs; a large file would want an index or a seek by time). A source returns a batch, not an iterator, so a range must fit in memory.
 
 ---
 
@@ -418,6 +485,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - Dev tools (pytest, ruff, mypy) go in `[dependency-groups] dev` (PEP 735), not an extra — not shipped with the package.
 - Consequence: adapters are imported lazily by the composition root, so `import site_ops` works without any extra.
 - **Why:** core installs with zero vendor tech (enforces design/1); each service image installs only its extras (arch/1).
+- **Amended (2026-11-01):** a service's core may depend on the framework it is built on. The agent requires `langgraph` and `langchain-core` (agent/4); its adapters stay extras (`openai-compat`, `mcp`, `http`).
 
 ### tooling/3 — Test tiers via pytest markers
 

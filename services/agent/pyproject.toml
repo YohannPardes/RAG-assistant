@@ -4,8 +4,21 @@ version = "0.1.0"                                # package version
 description = "Triage agent: reads logs, flags anomalies, calls rag and tickets over the network. Owns no data."  # one-line summary
 requires-python = ">=3.12"                       # minimum Python version
 dependencies = [                                 # runtime dependencies, installed in this service's image
+    "langchain-core>=1.7.3",
+    "langgraph>=1.2.19",
     "pydantic>=2",                               # data models and validation
     "siteops-common",                            # shared wire contracts
+]
+
+[project.optional-dependencies]
+openai-compat = [
+    "langchain-openai>=1.7.3",
+]
+mcp = [
+    "mcp>=2.3.0",
+]
+http = [
+    "httpx>=0.28.1",
 ]
 
 [tool.uv.sources]                                # where uv gets dependencies from, instead of PyPI

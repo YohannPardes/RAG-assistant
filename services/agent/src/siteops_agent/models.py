@@ -32,7 +32,7 @@ class Window:
 
     host: str
     rule: str  # which rule fired: a hint for the agent, not a verdict
-    start: datetime
-    end: datetime
+    start: datetime  # the first matching event's time (context before it not included)
+    end: datetime  # the last matching event's time
     events: tuple[LogEvent, ...]  # the matching events plus a little context before and after
     omitted: int = 0  # events left out by the size bound
