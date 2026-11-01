@@ -1,4 +1,4 @@
-{"question": "Which alert warns that a TLS certificate is about to expire, and how many days before expiry does it fire?", "expected_source": "runbook_cert_expiry.md", "expected_section": "1. Symptoms"}
+{"question": "Which alert warns that a public TLS certificate on the ingress is about to expire, and how many days before expiry does it fire?", "expected_source": "runbook_cert_expiry.md", "expected_section": "1. Symptoms"}
 {"question": "Users see NET::ERR_CERT_DATE_INVALID in their browser. What is going on?", "expected_source": "runbook_cert_expiry.md", "expected_section": "1. Symptoms"}
 {"question": "How long before expiry does cert-manager normally renew a certificate, and with which ACME challenge?", "expected_source": "runbook_cert_expiry.md", "expected_section": "2. How renewal normally works"}
 {"question": "How do I list the status of every certificate in the Kubernetes cluster?", "expected_source": "runbook_cert_expiry.md", "expected_section": "3.1 Check the certificate status"}
@@ -8,21 +8,21 @@
 {"question": "How do I manually trigger a renewal of the api-example-com certificate?", "expected_source": "runbook_cert_expiry.md", "expected_section": "4.1 Rotate the DNS API token"}
 {"question": "How can I check the expiry date of the certificate served on api.example.com after renewing it?", "expected_source": "runbook_cert_expiry.md", "expected_section": "4.2 Verify"}
 {"question": "Is it safe to delete the Certificate resource to force cert-manager to issue a new one?", "expected_source": "runbook_cert_expiry.md", "expected_section": "4.2 Verify"}
-{"question": "Who is the second-level contact for certificate expiry incidents?", "expected_source": "runbook_cert_expiry.md", "expected_section": "5. Escalation"}
+{"question": "Who is the second-level contact for public TLS certificate expiry incidents?", "expected_source": "runbook_cert_expiry.md", "expected_section": "5. Escalation"}
 {"question": "Which team owns the PostgreSQL failover runbook, and what severity is a primary outage?", "expected_source": "runbook_db_failover.docx", "expected_section": "RB-204: PostgreSQL Primary Failover"}
 {"question": "The orders database primary is down and Patroni did not promote a replica on its own. Which runbook applies?", "expected_source": "runbook_db_failover.docx", "expected_section": "1. When to use this runbook"}
 {"question": "Writes fail with 'FATAL: the database system is in recovery mode'. When should I start a manual failover?", "expected_source": "runbook_db_failover.docx", "expected_section": "1. When to use this runbook"}
 {"question": "What is the maximum replication lag allowed before promoting the Postgres replica?", "expected_source": "runbook_db_failover.docx", "expected_section": "3. Pre-checks"}
-{"question": "How do I check that the replica is healthy before a database failover?", "expected_source": "runbook_db_failover.docx", "expected_section": "3. Pre-checks"}
+{"question": "How do I check that the replica is healthy before a PostgreSQL failover?", "expected_source": "runbook_db_failover.docx", "expected_section": "3. Pre-checks"}
 {"question": "Which patronictl command promotes db-replica-02 to primary?", "expected_source": "runbook_db_failover.docx", "expected_section": "4.1 Promote the replica"}
 {"question": "After promoting the new primary, what do I have to do with pgbouncer?", "expected_source": "runbook_db_failover.docx", "expected_section": "4.1 Promote the replica"}
-{"question": "How do I stop the old primary from accepting writes and causing split-brain?", "expected_source": "runbook_db_failover.docx", "expected_section": "4.2 Fence the old primary"}
+{"question": "How do I stop the old PostgreSQL primary from accepting writes and causing split-brain?", "expected_source": "runbook_db_failover.docx", "expected_section": "4.2 Fence the old primary"}
 {"question": "After a failover, how do I rebuild db-primary-01 as a replica and optionally switch back to it?", "expected_source": "runbook_db_failover.docx", "expected_section": "5. Rollback"}
 {"question": "Who is the L3 escalation for a PostgreSQL failover and how do I reach them?", "expected_source": "runbook_db_failover.docx", "expected_section": "6. Escalation"}
 {"question": "Which hosts does the log-aggregator disk-space runbook cover, and which team owns it?", "expected_source": "runbook_disk_full.pdf", "expected_section": "RB-101: Disk Space Exhaustion on Log Servers"}
 {"question": "Applications are logging 'No space left on device' (errno 28). What does that indicate on the log servers?", "expected_source": "runbook_disk_full.pdf", "expected_section": "1. Symptoms"}
 {"question": "At what usage percentage is /var/log considered critical?", "expected_source": "runbook_disk_full.pdf", "expected_section": "2. Alert thresholds"}
-{"question": "The root filesystem is at 92% usage. What is the expected action?", "expected_source": "runbook_disk_full.pdf", "expected_section": "2. Alert thresholds"}
+{"question": "The root filesystem of a log server is at 92% usage. What is the expected action?", "expected_source": "runbook_disk_full.pdf", "expected_section": "2. Alert thresholds"}
 {"question": "How do I find which directories take the most space under /var/log?", "expected_source": "runbook_disk_full.pdf", "expected_section": "4.1 Find what is using the space"}
 {"question": "Why can df and du disagree about disk usage, and how do I find the files responsible?", "expected_source": "runbook_disk_full.pdf", "expected_section": "4.2 Check for deleted files still held open"}
 {"question": "How do I force a log rotation on the log servers?", "expected_source": "runbook_disk_full.pdf", "expected_section": "5. Remediation"}
@@ -34,6 +34,58 @@
 {"question": "What is the p99 latency target and timeout for GET /v2/search?", "expected_source": "runbook_high_latency.txt", "expected_section": "2. LATENCY TARGETS"}
 {"question": "How do I tell whether a single public-api pod is slow, and what do I do about it?", "expected_source": "runbook_high_latency.txt", "expected_section": "3.1 Is it one pod or all of them?"}
 {"question": "Which downstream dependencies should I check first when the public API is slow?", "expected_source": "runbook_high_latency.txt", "expected_section": "3.2 Is a dependency slow?"}
-{"question": "Below what redis hit ratio should I suspect a cold cache?", "expected_source": "runbook_high_latency.txt", "expected_section": "3.2 Is a dependency slow?"}
+{"question": "When the public API is slow, below what redis hit ratio should I suspect a cold cache?", "expected_source": "runbook_high_latency.txt", "expected_section": "3.2 Is a dependency slow?"}
 {"question": "API latency spiked right after a deploy. How do I roll back public-api?", "expected_source": "runbook_high_latency.txt", "expected_section": "4. REMEDIATION"}
 {"question": "Can I raise the public-api HPA maxReplicas above 20 to absorb the load?", "expected_source": "runbook_high_latency.txt", "expected_section": "4. REMEDIATION"}
+{"question": "Which alert fires when the billing MySQL primary goes down, and after how long?", "expected_source": "runbook_mysql_failover.pdf", "expected_section": "1. Symptoms"}
+{"question": "billing-api logs 'Can't connect to MySQL server' and the invoice job stalled. What state does Orchestrator report for the cluster?", "expected_source": "runbook_mysql_failover.pdf", "expected_section": "1. Symptoms"}
+{"question": "Through which port do applications reach billing-db, and which ProxySQL hostgroup takes the writes?", "expected_source": "runbook_mysql_failover.pdf", "expected_section": "2. Cluster topology"}
+{"question": "The billing MySQL primary answers from the bastion but not from the ProxySQL hosts. Should I fail over?", "expected_source": "runbook_mysql_failover.pdf", "expected_section": "3.1 Confirm the primary is really down"}
+{"question": "How far behind may mysql-billing-02 be before it can be promoted?", "expected_source": "runbook_mysql_failover.pdf", "expected_section": "3.2 Check replication lag on the candidate"}
+{"question": "What semi-sync timeout does billing-db use, and which status must the candidate replica show?", "expected_source": "runbook_mysql_failover.pdf", "expected_section": "3.3 Check semi-sync status"}
+{"question": "The old billing MySQL primary is still reachable. How do I make it refuse writes before failing over?", "expected_source": "runbook_mysql_failover.pdf", "expected_section": "4.1 Fence the old primary"}
+{"question": "Which orchestrator-client command promotes a new billing-db primary when the old one is dead?", "expected_source": "runbook_mysql_failover.pdf", "expected_section": "4.2 Promote the replica with Orchestrator"}
+{"question": "After a MySQL failover, ProxySQL still sends billing writes to mysql-billing-01. How do I fix that by hand?", "expected_source": "runbook_mysql_failover.pdf", "expected_section": "4.3 Repoint ProxySQL"}
+{"question": "When am I allowed to fail back to mysql-billing-01, and what if it took errant GTIDs?", "expected_source": "runbook_mysql_failover.pdf", "expected_section": "6. Rollback"}
+{"question": "How many days before expiry does the mesh intermediate CA alert become critical?", "expected_source": "runbook_internal_ca_expiry.docx", "expected_section": "1. Symptoms"}
+{"question": "Envoy sidecars log CERTIFICATE_VERIFY_FAILED and calls between services fail with 503 UF,URX. What is going on?", "expected_source": "runbook_internal_ca_expiry.docx", "expected_section": "1. Symptoms"}
+{"question": "What TTL do Istio workload certificates have, and when do sidecars renew them?", "expected_source": "runbook_internal_ca_expiry.docx", "expected_section": "2. How the mesh PKI is built"}
+{"question": "How do I check that istiod runs with the same intermediate CA as Vault?", "expected_source": "runbook_internal_ca_expiry.docx", "expected_section": "3.1 Check the intermediate CA expiry"}
+{"question": "How can I see whether the mesh certificate of a payments-api pod is still valid?", "expected_source": "runbook_internal_ca_expiry.docx", "expected_section": "3.2 Check workload certificates"}
+{"question": "Which Vault policy is needed to sign a new mesh intermediate CA, and who holds it?", "expected_source": "runbook_internal_ca_expiry.docx", "expected_section": "4.1 Issue a new intermediate in Vault"}
+{"question": "After rotating the intermediate, how do I get istiod to use it?", "expected_source": "runbook_internal_ca_expiry.docx", "expected_section": "4.2 Load the new intermediate into istiod"}
+{"question": "When is it safe to revoke the old mesh intermediate CA?", "expected_source": "runbook_internal_ca_expiry.docx", "expected_section": "4.3 Rotate workload certificates"}
+{"question": "Who is the L3 contact for a mesh-wide mTLS outage?", "expected_source": "runbook_internal_ca_expiry.docx", "expected_section": "6. Escalation"}
+{"question": "At what 5xx ratio does the critical public-api error alert fire, and what severity does it open?", "expected_source": "runbook_api_error_rate.md", "expected_section": "1. Symptoms"}
+{"question": "public-api is returning 504s. What does that status mean here?", "expected_source": "runbook_api_error_rate.md", "expected_section": "2. What each 5xx code means"}
+{"question": "How do I find which public-api routes produce the most 5xx errors?", "expected_source": "runbook_api_error_rate.md", "expected_section": "3.1 Break errors down by status code and route"}
+{"question": "Where do I check whether a feature flag changed just before public-api started failing?", "expected_source": "runbook_api_error_rate.md", "expected_section": "3.2 Check for a recent change"}
+{"question": "When does the public-api circuit breaker to its upstreams open, and what does it return?", "expected_source": "runbook_api_error_rate.md", "expected_section": "3.3 Check upstream services"}
+{"question": "The 5xx errors all come from one new public-api feature. What is the fastest fix?", "expected_source": "runbook_api_error_rate.md", "expected_section": "4.1 Use the feature flag kill switch"}
+{"question": "One API key is flooding public-api with requests. What rate limit should I apply?", "expected_source": "runbook_api_error_rate.md", "expected_section": "4.3 Rate-limit an abusive client"}
+{"question": "Can I restart every public-api pod at once to clear the 5xx errors?", "expected_source": "runbook_api_error_rate.md", "expected_section": "4.3 Rate-limit an abusive client"}
+{"question": "Who is the L3 for a SEV-1 public-api error-rate incident?", "expected_source": "runbook_api_error_rate.md", "expected_section": "6. Escalation"}
+{"question": "At what replay lag does PostgresReplicaLagHigh become critical?", "expected_source": "runbook_pg_replication_lag.html", "expected_section": "1. Symptoms"}
+{"question": "What happens to orders-db read traffic once replica lag is critical, and how fast must it be fixed?", "expected_source": "runbook_pg_replication_lag.html", "expected_section": "2. Impact and automatic protection"}
+{"question": "From the primary, how do I tell whether the Postgres replica is slow to apply WAL or the network is the bottleneck?", "expected_source": "runbook_pg_replication_lag.html", "expected_section": "3.1 Measure the lag from the primary"}
+{"question": "How do I check on db-replica-02 that the WAL receiver is still streaming?", "expected_source": "runbook_pg_replication_lag.html", "expected_section": "3.2 Check the WAL receiver on the replica"}
+{"question": "What max_standby_streaming_delay is set on the orders-db replica?", "expected_source": "runbook_pg_replication_lag.html", "expected_section": "3.3 Common causes of replica lag"}
+{"question": "Which report usually holds long-running queries on the orders-db replica?", "expected_source": "runbook_pg_replication_lag.html", "expected_section": "4.1 Cancel long-running queries on the replica"}
+{"question": "The weekly base backup saturates the Postgres replication link. What do I stop?", "expected_source": "runbook_pg_replication_lag.html", "expected_section": "4.2 Relieve network saturation"}
+{"question": "When should a lagging Postgres replica be rebuilt rather than left to catch up, and how long does that take?", "expected_source": "runbook_pg_replication_lag.html", "expected_section": "4.4 Rebuild a replica that fell too far behind"}
+{"question": "When does the KubePodOOMKilled alert fire?", "expected_source": "runbook_pod_oomkilled.html", "expected_section": "1. Symptoms"}
+{"question": "kubectl logs shows nothing useful for a crash-looping pod. Which flag shows the crashed container's log?", "expected_source": "runbook_pod_oomkilled.html", "expected_section": "2.1 Read the termination reason"}
+{"question": "What memory request and limit does checkout-worker run with?", "expected_source": "runbook_pod_oomkilled.html", "expected_section": "2.2 OOMKilled: exit code 137"}
+{"question": "A pod is in CrashLoopBackOff with exit code 143. What is killing it?", "expected_source": "runbook_pod_oomkilled.html", "expected_section": "2.3 CrashLoopBackOff without OOMKilled"}
+{"question": "By how much may I raise checkout-worker's memory limit in one change, and in which file?", "expected_source": "runbook_pod_oomkilled.html", "expected_section": "3.1 Raise the memory limit with Helm"}
+{"question": "How should the JVM heap be sized for a Java service that keeps getting OOMKilled?", "expected_source": "runbook_pod_oomkilled.html", "expected_section": "3.2 Size the JVM heap"}
+{"question": "Can I remove a pod's memory limit to stop it being OOMKilled?", "expected_source": "runbook_pod_oomkilled.html", "expected_section": "3.2 Size the JVM heap"}
+{"question": "How do I confirm the OOMKilled fix for checkout-worker worked?", "expected_source": "runbook_pod_oomkilled.html", "expected_section": "4. Verification"}
+{"question": "Which alert fires when a deployment rollout hits ProgressDeadlineExceeded?", "expected_source": "runbook_stuck_rollout.txt", "expected_section": "1. SYMPTOMS"}
+{"question": "How long does a payments-api rollout get before it is marked failed, and does Kubernetes roll it back on its own?", "expected_source": "runbook_stuck_rollout.txt", "expected_section": "2. HOW PAYMENTS-API IS DEPLOYED"}
+{"question": "New payments-api pods are in ImagePullBackOff with 'manifest unknown'. What does that mean?", "expected_source": "runbook_stuck_rollout.txt", "expected_section": "3.2 Pods in ImagePullBackOff"}
+{"question": "Which endpoint and port does the payments-api readiness probe call, and after how many failures is a pod unready?", "expected_source": "runbook_stuck_rollout.txt", "expected_section": "3.3 Readiness probe failing"}
+{"question": "I rolled back payments-api with kubectl but a few minutes later the broken version is back. Why?", "expected_source": "runbook_stuck_rollout.txt", "expected_section": "4.1 Pause Argo CD auto-sync"}
+{"question": "Why should I pass --to-revision when undoing a payments-api rollout?", "expected_source": "runbook_stuck_rollout.txt", "expected_section": "4.2 Roll back to a known good revision"}
+{"question": "After rolling back payments-api, how do I turn Argo CD auto-sync back on?", "expected_source": "runbook_stuck_rollout.txt", "expected_section": "4.3 Revert in git and re-enable auto-sync"}
+{"question": "Who is the L3 contact for a stuck payments-api rollout?", "expected_source": "runbook_stuck_rollout.txt", "expected_section": "6. ESCALATION"}

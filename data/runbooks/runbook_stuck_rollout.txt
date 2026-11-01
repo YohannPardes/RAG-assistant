@@ -1,0 +1,117 @@
+RB-603: STUCK DEPLOYMENT ROLLOUT
+================================
+
+Service:        payments-api (k8s namespace: payments)
+Severity:       SEV-2
+Owner:          Kubernetes Platform team
+Last reviewed:  2026-10-20
+
+
+1. SYMPTOMS
+-----------
+
+  * Alert KubeDeploymentRolloutStuck fires when a deployment reports
+    Progressing=False with reason ProgressDeadlineExceeded.
+  * Alert KubeDeploymentReplicasMismatch fires when updated replicas differ
+    from desired replicas for 15 minutes.
+  * Argo CD shows the application payments-api as "Progressing" or
+    "Degraded" instead of "Healthy".
+
+
+2. HOW PAYMENTS-API IS DEPLOYED
+-------------------------------
+
+  Argo CD syncs payments-api from the payments-deploy git repo with
+  auto-sync and selfHeal enabled; it checks git every 3 minutes. The
+  deployment runs 6 replicas with maxSurge 25% and maxUnavailable 0, so old
+  pods keep serving traffic while new ones fail. progressDeadlineSeconds is
+  600: after 10 minutes without progress the rollout is marked as failed,
+  but Kubernetes does not roll it back by itself.
+
+
+3. DIAGNOSIS
+------------
+
+  Find out why the new ReplicaSet cannot become ready. The two usual causes
+  are an image that cannot be pulled and a readiness probe that never
+  passes. Both leave the old ReplicaSet running at full size.
+
+3.1 Check the rollout state
+
+    kubectl -n payments rollout status deployment payments-api --timeout=30s
+    kubectl -n payments get rs -l app=payments-api
+    kubectl -n payments get pods -l app=payments-api
+
+  The newest ReplicaSet has pods that are not READY; the STATUS column
+  tells you which of the next two subsections applies.
+
+3.2 Pods in ImagePullBackOff
+
+    kubectl -n payments describe pod <POD_NAME> | grep -A3 Failed
+
+  "manifest unknown" means the tag was never pushed to
+  registry.internal.example.com; "401 Unauthorized" means the pull secret
+  regcred in namespace payments has expired. The kubelet retries the pull
+  with a back-off of up to 5 minutes.
+
+3.3 Readiness probe failing
+
+  Pods are Running with 0/1 READY. The probe calls GET /healthz/ready on
+  port 8080 every 10 seconds and marks the pod unready after 3 failures.
+  Check the events and the application log:
+
+    kubectl -n payments describe pod <POD_NAME> | grep "Readiness probe"
+    kubectl -n payments logs <POD_NAME> --tail=50
+
+
+4. REMEDIATION
+--------------
+
+  The fastest fix is to roll back to the last good revision, and then fix
+  the change in git. Follow the three steps below in order.
+
+4.1 Pause Argo CD auto-sync
+
+    argocd app set payments-api --sync-policy none
+
+  WARNING: do not roll back while auto-sync is still on. Argo CD sees the
+  live state drift from git and re-applies the broken revision within 3
+  minutes, undoing your rollback.
+
+4.2 Roll back to a known good revision
+
+    kubectl -n payments rollout history deployment payments-api
+    kubectl -n payments rollout undo deployment payments-api --to-revision=<N>
+
+  Pick the revision explicitly with --to-revision. Without it, undo only
+  goes back one revision, which may be another bad one.
+
+4.3 Revert in git and re-enable auto-sync
+
+  Revert the bad commit in payments-deploy, wait until the Argo CD diff for
+  payments-api is empty, then turn auto-sync back on:
+
+    argocd app set payments-api --sync-policy automated --self-heal
+
+
+5. VERIFICATION
+---------------
+
+  * kubectl -n payments rollout status deployment payments-api reports
+    "successfully rolled out".
+  * All 6 pods are READY 1/1 and the old ReplicaSet is scaled to 0.
+  * Argo CD shows payments-api as "Synced" and "Healthy".
+
+
+6. ESCALATION
+-------------
+
+  +-------+------------------------------+--------------------------------+
+  | Level | Who                          | Contact                        |
+  +-------+------------------------------+--------------------------------+
+  | L1    | On-call SRE                  | #ops-oncall                    |
+  | L2    | Kubernetes Platform on-call  | PagerDuty: k8s-platform        |
+  | L3    | Billing Engineering on-call  | PagerDuty: billing-eng         |
+  +-------+------------------------------+--------------------------------+
+
+  See also: RB-415 (high API latency) for rolling back public-api.

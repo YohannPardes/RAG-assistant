@@ -1,0 +1,89 @@
+RB-703: NTP CLOCK SKEW
+======================
+
+Service:        chronyd on all Linux hosts (time sources ntp-01, ntp-02)
+Severity:       SEV-3 (SEV-2 if offset above 1 s on any database host)
+Owner:          Platform Ops team
+Last reviewed:  2026-06-11
+
+
+1. SYMPTOMS
+-----------
+
+  * Alert NodeClockSkew fires: chrony offset above 100 ms for 10 minutes.
+  * Alert NodeClockNotSynchronising fires: chrony reports "Not synchronised"
+    or no reachable source for 15 minutes.
+  * Clients see TLS "certificate is not yet valid" errors, or services
+    reject JWTs with "token used before issued" (nbf/iat in the future).
+
+
+2. OFFSET THRESHOLDS
+--------------------
+
+  +---------------------+-----------+------------------------------------+
+  | Offset              | Level     | Typical effect                     |
+  +---------------------+-----------+------------------------------------+
+  | below 50 ms         | normal    | none                               |
+  | 100 ms to 500 ms    | warning   | JWT leeway (30 s) still absorbs it |
+  | 500 ms to 30 s      | critical  | Kafka/Patroni timing anomalies     |
+  | above 30 s          | outage    | JWT and TLS validation fail        |
+  +---------------------+-----------+------------------------------------+
+
+  Patroni leader keys use a 30 s TTL in etcd, so a member whose clock is
+  off by seconds can lose or wrongly keep the leader lock.
+
+
+3. DIAGNOSIS
+------------
+
+3.1 How far off is this host?
+
+    chronyc tracking
+    chronyc sources -v
+
+  In "chronyc tracking", "System time" is the current offset and "Leap
+  status" must be Normal. In "chronyc sources", the selected source is
+  marked "^*"; "^?" on every line means no source is reachable.
+
+3.2 Can the host reach the time servers?
+
+    chronyc sourcestats
+    nc -vzu ntp-01.internal 123
+    nc -vzu ntp-02.internal 123
+
+  UDP 123 must be open from every subnet to ntp-01 and ntp-02. If both
+  fail, check the firewall change log; if only this host drifts, check
+  for a VM paused or live-migrated in the last hour.
+
+
+4. REMEDIATION
+--------------
+
+4.1 Hosts without a database role
+
+  Restart chrony and let it step once (makestep 1.0 3 is set in
+  /etc/chrony/chrony.conf, so it steps only in the first 3 updates):
+
+    sudo systemctl restart chronyd
+    sudo chronyc makestep
+    chronyc tracking | grep 'System time'
+
+4.2 Database hosts and the Patroni primary
+
+  On a host that runs a database primary, let chrony slew instead of
+  stepping. Slewing corrects at most 83 ms per second (maxslewrate
+  83333 ppm), so a 5 s offset takes about a minute. For larger offsets,
+  switch over first (patronictl switchover, see RB-204), then fix the
+  clock on the former primary while it is a replica.
+
+  WARNING: do not step the clock (chronyc makestep, date -s) on a
+  running database primary. A backwards jump breaks timestamp ordering
+  in WAL and can make Patroni demote the primary unexpectedly.
+
+
+5. ESCALATION
+-------------
+
+  L1  On-call SRE                  #ops-oncall
+  L2  Platform Ops on-call         PagerDuty: platform-ops
+  L3  Data Platform on-call        PagerDuty: data-platform (database hosts only)

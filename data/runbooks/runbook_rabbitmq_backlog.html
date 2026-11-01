@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>RB-902: RabbitMQ Queue Backlog - SRE Runbooks - Wiki</title>
+<style>
+  body { font-family: Arial, Helvetica, sans-serif; margin: 0; color: #172b4d; }
+  nav.breadcrumbs { background: #f4f5f7; padding: 8px 24px; font-size: 12px; }
+  main { max-width: 960px; margin: 0 auto; padding: 16px 24px; }
+  table.confluenceTable { border-collapse: collapse; margin: 8px 0; }
+  table.confluenceTable th, table.confluenceTable td { border: 1px solid #c1c7d0; padding: 4px 8px; text-align: left; }
+  pre { background: #f4f5f7; padding: 8px; overflow-x: auto; }
+  aside.warning { background: #ffebe6; border-left: 4px solid #de350b; padding: 4px 12px; }
+  footer { font-size: 11px; color: #6b778c; padding: 16px 24px; border-top: 1px solid #dfe1e6; }
+</style>
+</head>
+<body>
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <span class="crumb"><a href="/wiki/spaces/SRE">SRE</a></span> <span class="sep">/</span>
+  <span class="crumb"><a href="/wiki/spaces/SRE/pages/runbooks">Runbooks</a></span> <span class="sep">/</span>
+  <span class="crumb"><a href="/wiki/spaces/SRE/pages/runbooks-streaming">Streaming</a></span> <span class="sep">/</span>
+  <span class="crumb current">RB-902</span>
+</nav>
+<main id="main-content" class="wiki-content">
+<h1 id="title-text"><span class="title-inner">RB-902: RabbitMQ Queue Backlog</span></h1>
+
+<div class="panel"><div class="panelContent">
+<table class="confluenceTable">
+  <tbody>
+    <tr><th>Service</th><td><span>rabbitmq-prod (3 nodes: rmq-01, rmq-02, rmq-03), vhost /notify</span></td></tr>
+    <tr><th>Severity</th><td><span>SEV-3 (SEV-2 if flow control blocks publishers)</span></td></tr>
+    <tr><th>Owner</th><td><span>Streaming team</span></td></tr>
+    <tr><th>Last reviewed</th><td><span>2026-10-19</span></td></tr>
+  </tbody>
+</table>
+</div></div>
+
+<h2 id="RB902-1-Symptoms">1. Symptoms</h2>
+<div class="panel"><div class="panelContent">
+<ul>
+  <li>Alert <strong>RabbitQueueDepthHigh</strong> fires when <code>notifications.email</code> holds more than <strong>50,000</strong> ready messages for 10 minutes.</li>
+  <li>Alert <strong>RabbitNoConsumers</strong> fires when a queue in vhost <code>/notify</code> has <strong>0</strong> consumers for 2 minutes.</li>
+  <li>Password-reset and order-confirmation emails arrive 20+ minutes late. This is not Kafka consumer lag; the email path uses RabbitMQ, not Kafka.</li>
+</ul>
+</div></div>
+
+<h2 id="RB902-2-Diagnosis">2. Diagnosis</h2>
+
+<h3 id="RB902-2.1">2.1 Queue depth, consumers and unacked messages</h3>
+<div class="panel"><div class="panelContent">
+<pre><code class="language-bash">kubectl -n messaging exec rmq-01 -- rabbitmqctl list_queues -p /notify \
+  name messages_ready messages_unacknowledged consumers &gt; /tmp/queues.txt
+grep -E 'notifications\.(email|email\.dlq)' /tmp/queues.txt</code></pre>
+<p><span>A healthy queue has 8 consumers (one per <code>email-sender</code> pod) and fewer than 400 unacked messages (prefetch 50 &times; 8). Ready messages growing with 0 consumers means the workers are down; many unacked with few acks per second means the workers are stuck on the SMTP relay.</span></p>
+</div></div>
+
+<h3 id="RB902-2.2">2.2 Memory high watermark and flow control</h3>
+<div class="panel"><div class="panelContent">
+<pre><code class="language-bash">kubectl -n messaging exec rmq-01 -- rabbitmqctl status | grep -A3 vm_memory_high_watermark
+kubectl -n messaging exec rmq-01 -- rabbitmqctl list_connections name state | grep -c flow</code></pre>
+<p><span>The watermark is <strong>0.4</strong> of the 8 GiB pod limit. Above it, the node raises a memory alarm and blocks all publishers; connections show state <code>blocked</code> or <code>flow</code> and the checkout service times out after 5 s while publishing.</span></p>
+</div></div>
+
+<h2 id="RB902-3-Remediation">3. Remediation</h2>
+
+<h3 id="RB902-3.1">3.1 Restore consumers</h3>
+<div class="panel"><div class="panelContent">
+<ol>
+  <li>Check the workers: <code>kubectl -n notify get deploy email-sender</code>.</li>
+  <li>If pods crash-loop on <code>SMTP 421</code>, the relay <code>smtp-relay.internal:587</code> is throttling; ask the Streaming team to lower send rate before scaling.</li>
+  <li>Otherwise scale out, up to <strong>16</strong> replicas (the relay allows 200 connections):</li>
+</ol>
+<pre><code class="language-bash">kubectl -n notify scale deploy email-sender --replicas=16</code></pre>
+</div></div>
+
+<h3 id="RB902-3.2">3.2 Handle the dead-letter queue</h3>
+<div class="panel"><div class="panelContent">
+<p><span>Messages rejected 5 times go to <code>notifications.email.dlq</code> (TTL 7 days). After the root cause is fixed, move them back with the shovel helper, at most 1,000 per minute:</span></p>
+<pre><code class="language-bash">./rmq-tools shovel --from notifications.email.dlq --to notifications.email --rate 1000 &amp;&amp; echo done</code></pre>
+</div></div>
+
+<aside class="warning"><p><strong>Warning:</strong> do not purge <code>notifications.email</code> (<code>rabbitmqctl purge_queue</code>) to clear the backlog. Messages are not stored anywhere else, so purging silently drops password resets and order confirmations. If memory is critical, scale consumers or add a lazy-queue policy instead.</p></aside>
+
+<h2 id="RB902-4-Escalation">4. Escalation</h2>
+<div class="panel"><div class="panelContent">
+<table class="confluenceTable">
+  <thead><tr><th>Level</th><th>Who</th><th>Contact</th></tr></thead>
+  <tbody>
+    <tr><td>L1</td><td>On-call SRE</td><td>#ops-oncall</td></tr>
+    <tr><td>L2</td><td>Streaming team on-call</td><td>PagerDuty: streaming</td></tr>
+    <tr><td>L3</td><td>Platform Ops on-call</td><td>PagerDuty: platform-ops (node or disk failure on rmq-0x)</td></tr>
+  </tbody>
+</table>
+</div></div>
+</main>
+<footer>
+  <span class="author">Last edited by Dana Kowalski on Oct 19, 2026</span> &middot; <span class="labels">Labels: runbook, rabbitmq, streaming</span> &middot; <span class="viewcount">412 views</span>
+</footer>
+</body>
+</html>

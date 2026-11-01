@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>RB-207: Redis Memory Pressure and Evictions | SiteOps Wiki</title>
+<style>
+  body { font-family: Georgia, serif; margin: 0 auto; max-width: 900px; color: #222; }
+  header nav { font-size: 12px; color: #666; padding: 10px 0; }
+  h1 { border-bottom: 2px solid #c0392b; }
+  dl.meta dt { font-weight: bold; float: left; width: 140px; }
+  dl.meta dd { margin-left: 150px; }
+  dl.fields dt { font-family: monospace; margin-top: 6px; }
+  pre { background: #272822; color: #f8f8f2; padding: 10px; }
+  aside.warning { border: 2px solid #c0392b; padding: 0 10px; }
+  table { border-collapse: collapse; }
+  th, td { border: 1px solid #999; padding: 3px 8px; }
+  footer { font-size: 11px; color: #888; margin-top: 30px; }
+</style>
+</head>
+<body>
+<header>
+<nav aria-label="breadcrumb">Home &raquo; Operations &raquo; Runbooks &raquo; Caching &raquo; RB-207</nav>
+</header>
+<main>
+<h1>RB-207: Redis Memory Pressure and Evictions</h1>
+
+<table>
+  <tr><th>Service</th><td>redis-cache (Redis 7.2, Sentinel: redis-cache-01 primary, redis-cache-02/03 replicas)</td></tr>
+  <tr><th>Severity</th><td>SEV-3 (SEV-2 if the public-api hit ratio drops below 85%)</td></tr>
+  <tr><th>Owner</th><td>Data Platform team</td></tr>
+  <tr><th>Last reviewed</th><td>2026-08-11</td></tr>
+</table>
+
+<h2>1. Symptoms</h2>
+<ul>
+  <li>Alert <strong>RedisMemoryHigh</strong> fires when <code>used_memory</code> is above 90% of <code>maxmemory</code> for 10 minutes.</li>
+  <li>Alert <strong>RedisEvictionsHigh</strong> fires when <code>evicted_keys</code> grows faster than 500 keys/s for 5 minutes.</li>
+  <li>The cache hit ratio falls and public-api latency rises (the "cold cache" case in RB-415).</li>
+</ul>
+
+<h2>2. Memory configuration</h2>
+<p>Each redis-cache host has 32 GB of RAM. <code>maxmemory</code> is <strong>24gb</strong> and <code>maxmemory-policy</code> is <strong>allkeys-lru</strong>: when the limit is reached Redis evicts the least recently used keys, whether or not they have a TTL. The remaining 8 GB is headroom for the fork done by background saves (copy-on-write) and for the OS.</p>
+
+<h2>3. Diagnosis</h2>
+
+<h3>3.1 Read INFO memory</h3>
+<pre><code class="language-bash">redis-cli -h redis-cache-01 -p 6379 INFO memory
+redis-cli -h redis-cache-01 -p 6379 INFO stats | grep -E 'evicted_keys|keyspace_hits|keyspace_misses'
+</code></pre>
+<p>The fields that matter:</p>
+<dl class="fields">
+  <dt>used_memory_human</dt><dd>Memory used by data; compare with <code>maxmemory_human</code>.</dd>
+  <dt>mem_fragmentation_ratio</dt><dd>Above 1.5 means fragmentation, not real data growth.</dd>
+  <dt>evicted_keys</dt><dd>Cumulative count; take the rate over 1 minute.</dd>
+</dl>
+
+<h3>3.2 Find big keys</h3>
+<p>Run the scan on the replica redis-cache-02, never on the primary:</p>
+<pre><code class="language-bash">redis-cli -h redis-cache-02 --bigkeys -i 0.1
+redis-cli -h redis-cache-02 MEMORY USAGE "&lt;KEY&gt;" SAMPLES 0
+</code></pre>
+<p>A single key above 100 MB (usually a <code>report:*</code> hash or a <code>feed:*</code> list) is a bug in the writer.</p>
+
+<h3>3.3 Find keys without a TTL</h3>
+<p><code>INFO keyspace</code> prints <code>keys=</code> and <code>expires=</code> per database. If fewer than 80% of keys in db0 have an expiry, a writer is storing keys without a TTL. Sample them with <code>redis-cli --scan --pattern 'session:*' --count 1000</code> and <code>TTL &lt;KEY&gt;</code> (-1 means no TTL).</p>
+
+<h2>4. Remediation</h2>
+
+<h3>4.1 Raise maxmemory temporarily</h3>
+<pre><code class="language-bash">for h in redis-cache-01 redis-cache-02 redis-cache-03; do
+  redis-cli -h "$h" CONFIG SET maxmemory 26gb &amp;&amp; redis-cli -h "$h" CONFIG REWRITE
+done
+</code></pre>
+<p>26gb is the ceiling on 32 GB hosts. Set it on all three hosts so a Sentinel failover does not bring back the old limit.</p>
+
+<h3>4.2 Defragment or remove big keys</h3>
+<p>If <code>mem_fragmentation_ratio</code> is above 1.5, run <code>CONFIG SET activedefrag yes</code>. For an oversized key, get the owning team's approval and delete it with <code>UNLINK &lt;KEY&gt;</code>, which frees memory in the background instead of blocking like <code>DEL</code>.</p>
+
+<aside class="warning"><p><strong>Warning:</strong> never run <code>FLUSHALL</code>, <code>FLUSHDB</code> or <code>KEYS *</code> on redis-cache in production. <code>KEYS *</code> blocks the single Redis thread for seconds, and flushing empties the cache so every request falls through to orders-db at once. Use <code>SCAN</code> with <code>COUNT 1000</code> instead. Do not switch the policy to <code>noeviction</code> either: writes then fail with <code>OOM command not allowed</code>.</p></aside>
+
+<h2>5. Escalation</h2>
+<table>
+  <tr><th>Level</th><th>Who</th><th>Contact</th></tr>
+  <tr><td>L1</td><td>On-call SRE</td><td>#ops-oncall</td></tr>
+  <tr><td>L2</td><td>Data Platform on-call</td><td>PagerDuty: data-platform</td></tr>
+  <tr><td>L3</td><td>API Platform on-call (if a public-api writer is at fault)</td><td>PagerDuty: api-platform</td></tr>
+</table>
+<p>Related: RB-415 High API Latency.</p>
+</main>
+<footer>Last edited by Tomasz Wierzbicki, 2026-08-11 14:02 UTC &middot; Exported from SiteOps Wiki</footer>
+</body>
+</html>

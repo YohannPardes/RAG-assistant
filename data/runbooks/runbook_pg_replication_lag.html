@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>RB-206: PostgreSQL Replica Lag - Ops Wiki</title>
+<style>
+  body { font-family: Arial, Helvetica, sans-serif; margin: 0; color: #172b4d; }
+  nav.breadcrumbs { padding: 8px 24px; background: #f4f5f7; font-size: 13px; }
+  main { padding: 16px 24px; max-width: 960px; }
+  .panel { border: 1px solid #dfe1e6; border-radius: 3px; margin: 12px 0; padding: 4px 16px; }
+  table { border-collapse: collapse; }
+  th, td { border: 1px solid #c1c7d0; padding: 4px 8px; text-align: left; }
+  pre { background: #f4f5f7; padding: 8px; overflow-x: auto; }
+  aside.warning { background: #fffae6; border-left: 4px solid #ff991f; padding: 4px 12px; }
+  footer { padding: 8px 24px; color: #6b778c; font-size: 12px; border-top: 1px solid #dfe1e6; }
+</style>
+</head>
+<body>
+<nav class="breadcrumbs">Spaces / Site Operations / Runbooks / Data Platform / RB-206</nav>
+<main>
+<h1>RB-206: PostgreSQL Replica Lag</h1>
+
+<div class="panel">
+<table>
+  <tr><th>Service</th><td>orders-db replica db-replica-02 (primary db-primary-01)</td></tr>
+  <tr><th>Severity</th><td>SEV-3 at warning, SEV-2 at critical</td></tr>
+  <tr><th>Owner</th><td>Data Platform team</td></tr>
+  <tr><th>Last reviewed</th><td>2026-10-08</td></tr>
+</table>
+</div>
+
+<div class="panel">
+<h2>1. Symptoms</h2>
+<ul>
+  <li>Alert <strong>PostgresReplicaLagHigh</strong> fires at <strong>warning</strong> when replay lag on db-replica-02 exceeds <strong>64 MB</strong> for 5 minutes, and at <strong>critical</strong> above <strong>256 MB</strong> or a <code>replay_lag</code> above <strong>120 seconds</strong>.</li>
+  <li>Customers do not see an order they just placed: reads through the <code>orders-db-ro</code> endpoint are stale.</li>
+  <li>The RB-204 failover pre-check (lag under 16 MB) fails.</li>
+</ul>
+</div>
+
+<div class="panel">
+<h2>2. Impact and automatic protection</h2>
+<p>At critical, the pgbouncer health check removes db-replica-02 from the <code>orders-db-ro</code> read pool and read traffic falls back to db-primary-01. That keeps reads correct but adds about 30% CPU on the primary, so a critical lag must be fixed within 1 hour, before the nightly batch at 01:00 UTC.</p>
+</div>
+
+<div class="panel">
+<h2>3. Diagnosis</h2>
+
+<h3>3.1 Measure the lag from the primary</h3>
+<p>On db-primary-01:</p>
+<pre><code class="language-bash">sudo -u postgres psql -xc "SELECT application_name, state, sent_lsn, replay_lsn,
+  pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn)) AS replay_bytes,
+  replay_lag FROM pg_stat_replication;"
+</code></pre>
+<p>If <code>sent_lsn</code> is close to the current LSN but <code>replay_lsn</code> is far behind, the replica is slow to apply. If <code>sent_lsn</code> itself is behind, the network is the bottleneck.</p>
+
+<h3>3.2 Check the WAL receiver on the replica</h3>
+<p>On db-replica-02:</p>
+<pre><code class="language-bash">sudo -u postgres psql -xc "SELECT status, sender_host, last_msg_receipt_time,
+  latest_end_lsn FROM pg_stat_wal_receiver;"
+</code></pre>
+<p><code>status</code> must be <code>streaming</code>. A <code>last_msg_receipt_time</code> older than 30 seconds means the replication connection is stuck; no row at all means the receiver is down.</p>
+
+<h3>3.3 Common causes of replica lag</h3>
+<table>
+  <tr><th>Cause</th><th>Signal</th><th>Fix</th></tr>
+  <tr><td>Long-running query on the replica</td><td>Query older than 5 min in <code>pg_stat_activity</code>; <code>hot_standby_feedback=on</code> and <code>max_standby_streaming_delay=30s</code></td><td>Section 4.1</td></tr>
+  <tr><td>Network saturation</td><td>Replication link <code>eth1</code> (10 Gbit/s) above 90%</td><td>Section 4.2</td></tr>
+  <tr><td>Disk I/O on the replica</td><td><code>iostat -x 5</code> shows await above 20 ms on <code>nvme1n1</code></td><td>Section 4.3</td></tr>
+</table>
+</div>
+
+<div class="panel">
+<h2>4. Remediation</h2>
+
+<h3>4.1 Cancel long-running queries on the replica</h3>
+<pre><code class="language-bash">sudo -u postgres psql -c "SELECT pid, now() - query_start AS age, left(query, 60)
+  FROM pg_stat_activity WHERE state = 'active' AND now() - query_start &gt; interval '5 minutes';"
+sudo -u postgres psql -c "SELECT pg_cancel_backend(&lt;PID&gt;);"
+</code></pre>
+<p>The usual offender is the <code>nightly_revenue_export</code> report; ask Data Platform to move it to the analytics warehouse.</p>
+
+<h3>4.2 Relieve network saturation</h3>
+<p>Confirm with <code>sar -n DEV 1 10</code> on db-replica-02. The common cause is the weekly base backup copying over the same link: pause it with <code>sudo systemctl stop walg-backup.service</code> and restart it after the lag is under 16 MB.</p>
+
+<h3>4.3 Relieve disk I/O pressure</h3>
+<p>Check for a running <code>VACUUM</code> or <code>pg_repack</code> on the replica host and stop it. If await stays above 20 ms with nothing else running, the NVMe drive may be failing: page the Storage team.</p>
+
+<h3>4.4 Rebuild a replica that fell too far behind</h3>
+<p>If the replica logs <code>requested WAL segment has already been removed</code>, or lag is above 50 GB, rebuild it from the primary:</p>
+<pre><code class="language-bash">sudo -u postgres pg_basebackup -h db-primary-01 -D /var/lib/postgresql/16/main \
+  -X stream -P -R -c fast 2&gt;&amp;1 | tee /tmp/basebackup.log
+</code></pre>
+<p>A rebuild of the 1.2 TB cluster takes about 2 hours.</p>
+
+<aside class="warning"><p><strong>Warning:</strong> do not promote a lagging replica, even if the primary looks unhealthy. Every transaction not yet replayed on db-replica-02 is lost permanently. Promote only when lag is under 16 MB, as RB-204 requires.</p></aside>
+</div>
+
+<div class="panel">
+<h2>5. Verification</h2>
+<ul>
+  <li><code>replay_bytes</code> in <code>pg_stat_replication</code> stays under 16 MB for 15 minutes.</li>
+  <li>PostgresReplicaLagHigh resolves, and pgbouncer shows db-replica-02 back in the <code>orders-db-ro</code> pool (<code>SHOW SERVERS;</code> on the pgbouncer admin console).</li>
+</ul>
+</div>
+
+<div class="panel">
+<h2>6. Escalation</h2>
+<table>
+  <tr><th>Level</th><th>Who</th><th>Contact</th></tr>
+  <tr><td>L1</td><td>On-call SRE</td><td>#ops-oncall</td></tr>
+  <tr><td>L2</td><td>Data Platform on-call</td><td>PagerDuty: data-platform</td></tr>
+  <tr><td>L3</td><td>Storage team (disk or NVMe failure)</td><td>PagerDuty: storage</td></tr>
+</table>
+<p>Related: RB-204 PostgreSQL Primary Failover, RB-102 Disk Space Exhaustion on Database Hosts.</p>
+</div>
+</main>
+<footer>Last edited by Priya Raman on 2026-10-08 · Viewed 412 times · Labels: postgres, orders-db, replication</footer>
+</body>
+</html>
