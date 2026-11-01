@@ -61,7 +61,7 @@ class ChunkingSettings(_Section):
 
 
 class RetrievalSettings(_Section):
-    top_k: int = Field(default=5, ge=1, le=50)  # chunks retrieved when a request sends no top_k (rag/7)
+    top_k: int = Field(default=10, ge=1, le=50)  # chunks retrieved when a request sends no top_k (rag/7)
 
 
 class VectorStoreSettings(_Section):

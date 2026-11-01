@@ -30,7 +30,7 @@ def test_defaults_apply_when_there_is_no_file(isolated_env) -> None:
 
     assert settings.embedding.dimension == 1024
     assert settings.chunking.max_length == 1000
-    assert settings.retrieval.top_k == 5
+    assert settings.retrieval.top_k == 10
     assert settings.vector_store.backend == "qdrant"
 
 

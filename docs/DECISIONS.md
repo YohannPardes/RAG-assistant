@@ -24,7 +24,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 | Priority                       | Decisions                                                                                                                                                                                                                                                                                              |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **P1 — before code**    | rag/5 embedding model · agent/2 access levels                                                                                                                                                                                              |
-| **P2 — while building** | rag/6 chunking · rag/7 retrieval depth · rag/8 reranker model · rag/9 "I don't know" rule · rag/10 citations · agent/5 auth · scope/4 golden set · scope/5 eval thresholds · arch/8 persistence · tooling/6 CI |
+| **P2 — while building** | rag/6 chunking · rag/8 reranker model · rag/9 "I don't know" rule · rag/10 citations · agent/5 auth · scope/4 golden set · scope/5 eval thresholds · arch/8 persistence · tooling/6 CI |
 | **P3 — cut candidates** | rag/11 hybrid search · scope/6 LLM-judge metric · arch/9 distributed tracing · agent/6 scheduled triage · arch/10 backups                                                                                                                                                                          |
 
 ---
@@ -250,10 +250,12 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 
 ### rag/7 — Retrieval depth
 
-**Status:** Open · **Priority:** P2
+**Status:** Decided (2026-11-01)
 
 - k fetched from Qdrant before reranking, k kept after.
-- **Where k is set (2026-11-01):** `retrieval.top_k` in `services/rag/config.yaml` (default 5, 1–50) is used when a `/search` or `/ask` request sends no `top_k`; the contracts' `top_k` is optional (`None` = the service's default), so the number lives in one place. `scripts/run_eval.py` uses the same value unless `--top-k` is given. The value itself is still open: on the 91-question golden set recall@5 is 0.956 and recall@10 0.989.
+- **Where k is set (2026-11-01):** `retrieval.top_k` in `services/rag/config.yaml` (1–50) is used when a `/search` or `/ask` request sends no `top_k`; the contracts' `top_k` is optional (`None` = the service's default), so the number lives in one place. `scripts/run_eval.py` uses the same value unless `--top-k` is given. On the 91-question golden set, recall@5 is 0.956 and recall@10 0.989.
+- **Decision (2026-11-01): the default is 10**, in `config.yaml` and as the code default when there is no file. Recall@10 is 0.989 against 0.956 at 5: about 3 more questions in 100 get the right runbook into the context.
+- **Cost:** twice the context for `/ask`, so slower answers on the local model. The triage agent's `search_runbooks` can still ask for fewer (the probe used 3). How many chunks the reranker keeps is rag/8's.
 
 ### rag/8 — Reranker model
 
