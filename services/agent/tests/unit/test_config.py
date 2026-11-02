@@ -77,3 +77,26 @@ def test_the_api_key_comes_from_the_environment_and_must_be_long_enough(monkeypa
     monkeypatch.setenv("AGENT_API__API_KEY", "short")
     with pytest.raises(ValidationError):
         Settings(_env_file=None)  # type: ignore[call-arg]
+
+
+def test_the_docker_config_differs_from_the_real_one_only_where_the_container_runs() -> None:
+    # a tuning change (a model, a budget, a timeout) made in config.yaml alone would not reach the image
+    local, docker = (yaml.safe_load(REAL_CONFIG.with_name(name).read_text()) for name in ("config.yaml", "config.docker.yaml"))
+    for config in (local, docker):
+        for section in config.values():
+            for where in ("base_url", "url"):  # its neighbours, as the host or the compose network sees them
+                section.pop(where, None)
+        config["logs"].pop("path")  # the mounted folder
+        config["api"].pop("host")  # 0.0.0.0 in a container
+        config["api"].pop("port")
+
+    assert docker == local
+
+
+def test_the_docker_config_loads(monkeypatch) -> None:
+    monkeypatch.setenv("AGENT_TICKETS__API_KEY", API_KEY)
+    monkeypatch.setenv("AGENT_CONFIG_FILE", str(REAL_CONFIG.with_name("config.docker.yaml")))
+
+    settings = Settings(_env_file=None)  # type: ignore[call-arg]
+
+    assert settings.llm.model and settings.api.port
