@@ -3,6 +3,11 @@ FROM python:3.12-slim
 
 COPY --from=ghcr.io/astral-sh/uv:0.13.1 /uv /bin/uv
 
+# fonts for docling's PDF conversion: the runbooks' PDFs don't embed theirs (Helvetica, Courier...), and docling finds
+# headings on an image of each page. With no font to draw them, headings merge into the text and sections are lost.
+# Liberation has the same metrics as Helvetica, Times and Courier.
+RUN apt-get update && apt-get install -y --no-install-recommends fontconfig fonts-liberation && rm -rf /var/lib/apt/lists/*
+
 # no dev group in the image; copy packages into the venv instead of linking to uv's cache
 ENV UV_NO_DEV=1 UV_LINK_MODE=copy UV_COMPILE_BYTECODE=1
 ARG EXTRAS="--extra openai-compat --extra qdrant"
