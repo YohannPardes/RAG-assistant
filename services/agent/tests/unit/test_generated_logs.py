@@ -30,7 +30,7 @@ def fault_windows(faults) -> list[tuple[str, datetime, datetime]]:
 
 
 def test_every_generated_line_parses_and_keeps_its_fields(generate_logs, generated) -> None:
-    lines, _ = generated
+    lines, _, _ = generated
     text = [generate_logs.format_line(line) + "\n" for line in lines]
 
     events, unparsable = SyslogStyleParser().parse_lines(text)
@@ -49,7 +49,7 @@ def test_the_same_seed_gives_the_same_log_and_faults(generate_logs, generated) -
 
 
 def test_every_fault_is_seeded_once_inside_the_log_and_none_overlap(generate_logs, generated) -> None:
-    _, faults = generated
+    _, faults, _ = generated
     windows = fault_windows(faults)
 
     assert sorted(fault_type for fault_type, _, _ in windows) == sorted(f.fault_type for f in generate_logs.FAULTS)
@@ -74,7 +74,7 @@ def test_a_fault_writes_only_inside_its_window_and_on_its_affected_hosts(generat
 @pytest.mark.parametrize("seed", [1, 7, 42])
 def test_outside_the_faults_only_decoys_are_above_info(generate_logs, seed) -> None:
     # normal noise is INFO only, so every WARN or ERROR outside a fault is a planned decoy: a ticket for it is a false positive
-    lines, faults = generate_logs.generate(seed=seed, start=START, hours=HOURS)
+    lines, faults, _ = generate_logs.generate(seed=seed, start=START, hours=HOURS)
     windows = fault_windows(faults)
     margin = timedelta(minutes=5)
 
@@ -95,7 +95,7 @@ def test_outside_the_faults_only_decoys_are_above_info(generate_logs, seed) -> N
     ids=["primary-down", "replica-no-leader", "probe-no-success"],
 )
 def test_a_silenced_host_logs_no_normal_noise_during_its_fault(generated, fault_type, host, forbidden) -> None:
-    lines, faults = generated
+    lines, faults, _ = generated
     _, start, end = next(window for window in fault_windows(faults) if window[0] == fault_type)
 
     during = [message for t, _, line_host, _, message in lines if line_host == host and start <= t < end]
@@ -124,6 +124,7 @@ def test_main_writes_the_log_and_its_ground_truth(generate_logs, tmp_path, monke
     assert (ground_truth["seed"], ground_truth["start"], ground_truth["end"]) == (42, "2026-11-01T06:00:00Z", "2026-11-01T08:00:00Z")
     fault = next(f for f in ground_truth["faults"] if f["fault_type"] == "pg_primary_down")
     assert set(fault) == {"id", "fault_type", "host", "affected_hosts", "start", "end", "expected_runbook"}
+    assert ground_truth["decoys"] and set(ground_truth["decoys"][0]) == {"id", "host", "start", "end", "message"}
     assert fault["host"] == "db-primary-01"
     assert {"db-replica-02", "api-01", "api-02", "api-03"} <= set(fault["affected_hosts"])  # its symptoms are elsewhere
 
@@ -134,3 +135,16 @@ def test_fewer_than_two_hours_is_refused(generate_logs, monkeypatch) -> None:
 
     with pytest.raises(SystemExit):
         generate_logs.main()
+
+
+def test_every_decoy_is_recorded_with_its_lines_and_away_from_the_faults(generate_logs, generated) -> None:
+    lines, faults, decoys = generated
+    margin = timedelta(minutes=5)
+
+    assert len(decoys) == HOURS * 2  # about two an hour
+    for decoy in decoys:
+        start, end = datetime.fromisoformat(decoy["start"]), datetime.fromisoformat(decoy["end"])
+        assert any(
+            generate_logs.iso(t) == decoy["start"] and (host, message) == (decoy["host"], decoy["message"]) for t, _, host, _, message in lines
+        )
+        assert all(end + margin <= f_start or f_end + margin <= start for _, f_start, f_end in fault_windows(faults))

@@ -218,3 +218,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# eval runs: one folder per run (reports, generated logs, transcripts); the history line in data/eval_history.jsonl is kept.
+# Not under data/: ingestion reads all of it.
+eval_runs/

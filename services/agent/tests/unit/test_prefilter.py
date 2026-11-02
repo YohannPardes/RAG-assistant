@@ -285,7 +285,7 @@ def test_each_decoy_on_its_own_opens_no_window_but_the_504(generate_logs) -> Non
 
 @pytest.fixture(scope="module", params=[1, 7, 42])
 def generated(request, generate_logs):
-    lines, faults = generate_logs.generate(seed=request.param, start=START, hours=4)
+    lines, faults, _ = generate_logs.generate(seed=request.param, start=START, hours=4)
     events, _ = SyslogStyleParser().parse_lines(generate_logs.format_line(line) for line in lines)
     return find_windows(events), faults
 

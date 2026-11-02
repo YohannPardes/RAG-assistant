@@ -1,8 +1,9 @@
 """Synthetic site logs with seeded faults: the triage agent's input and the eval's ground truth.
 
 Writes data/logs/site.log (normal noise from fake hosts, harmless one-off warnings, seeded faults) and
-data/logs/ground_truth.json (one entry per seeded fault: type, host, affected hosts, start, end, expected runbook).
-The one-off warnings ("decoys") are not faults: a ticket for one counts as a false positive.
+data/logs/ground_truth.json (one entry per seeded fault: type, host, affected hosts, start, end, expected runbook; and
+one per decoy: host, start, end, its first message). The one-off warnings ("decoys") are not faults: a ticket for one
+counts as a false positive.
 Same seed and arguments give the same files.
 Usage: uv run python scripts/generate_logs.py [--seed 42] [--hours 4] [--start 2026-11-01T06:00:00Z] [--out-dir data/logs]
 
@@ -17,6 +18,7 @@ from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 POD = "shop/checkout-worker-7d9f8-x2k4q"
@@ -264,8 +266,9 @@ def decoy_time(rng: random.Random, start: datetime, end: datetime, windows: list
             return t
 
 
-def generate(seed: int, start: datetime, hours: float) -> tuple[list[Line], list[dict[str, str | list[str]]]]:
-    """All log lines in time order, and the ground-truth entry of every seeded fault."""
+def generate(seed: int, start: datetime, hours: float) -> tuple[list[Line], list[dict[str, str | list[str]]], list[dict[str, str]]]:
+    """All log lines in time order, the ground-truth entry of every seeded fault, and of every decoy (not a fault:
+    a ticket for one is a false positive, a window on one should be dismissed)."""
     rng = random.Random(seed)
     end = start + timedelta(hours=hours)
     windows = sorted(schedule(rng, start, end), key=lambda window: window[1])
@@ -293,9 +296,13 @@ def generate(seed: int, start: datetime, hours: float) -> tuple[list[Line], list
                 "expected_runbook": fault.expected_runbook,
             }
         )
+    decoys: list[dict[str, str]] = []
     for i in range(int(hours * 2)):  # about two decoys an hour, each kind in turn
-        lines += DECOYS[i % len(DECOYS)](decoy_time(rng, start, end, windows))
-    return sorted(lines, key=lambda line: line[0]), faults
+        decoy = DECOYS[i % len(DECOYS)](decoy_time(rng, start, end, windows))
+        lines += decoy
+        first, last = decoy[0], decoy[-1]
+        decoys.append({"id": f"D{i + 1}", "host": first[2], "start": iso(first[0]), "end": iso(last[0]), "message": first[4]})
+    return sorted(lines, key=lambda line: line[0]), faults, sorted(decoys, key=lambda decoy: decoy["start"])
 
 
 def main() -> None:
@@ -310,13 +317,26 @@ def main() -> None:
         parser.error("--hours must be at least 2")
 
     start = args.start.astimezone(UTC) if args.start.tzinfo else args.start.replace(tzinfo=UTC)
-    lines, faults = generate(args.seed, start, args.hours)
+    truth = write(args.out_dir, args.seed, start, args.hours)
+    print(f"wrote {truth['lines']} lines with {len(truth['faults'])} faults to {args.out_dir / 'site.log'}, ground truth in ground_truth.json")
 
-    args.out_dir.mkdir(parents=True, exist_ok=True)
-    (args.out_dir / "site.log").write_text("".join(format_line(line) + "\n" for line in lines), encoding="utf-8", newline="\n")
-    ground_truth = {"seed": args.seed, "start": iso(start), "end": iso(start + timedelta(hours=args.hours)), "log_file": "site.log", "faults": faults}
-    (args.out_dir / "ground_truth.json").write_text(json.dumps(ground_truth, indent=2) + "\n", encoding="utf-8", newline="\n")
-    print(f"wrote {len(lines)} lines with {len(faults)} faults to {args.out_dir / 'site.log'}, ground truth in ground_truth.json")
+
+def write(out_dir: Path, seed: int, start: datetime, hours: float) -> dict[str, Any]:
+    """site.log and ground_truth.json in `out_dir`; returns the ground truth. Also used by scripts/run_eval.py."""
+    lines, faults, decoys = generate(seed, start, hours)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "site.log").write_text("".join(format_line(line) + "\n" for line in lines), encoding="utf-8", newline="\n")
+    ground_truth = {
+        "seed": seed,
+        "start": iso(start),
+        "end": iso(start + timedelta(hours=hours)),
+        "log_file": "site.log",
+        "lines": len(lines),
+        "faults": faults,
+        "decoys": decoys,
+    }
+    (out_dir / "ground_truth.json").write_text(json.dumps(ground_truth, indent=2) + "\n", encoding="utf-8", newline="\n")
+    return ground_truth
 
 
 if __name__ == "__main__":
