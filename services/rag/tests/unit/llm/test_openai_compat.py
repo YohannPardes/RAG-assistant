@@ -82,8 +82,17 @@ def _raise_timeout(request: httpx.Request) -> httpx.Response:
         lambda request: completion('["Run df -h"]'),  # JSON, but not an object
         lambda request: httpx.Response(200, text="<html>proxy error</html>"),  # body is not JSON at all
     ],
-    ids=["http-503", "http-404", "connection-refused", "timeout", "no-choices", "empty-choices",
-         "content-not-json", "content-not-an-object", "body-not-json"],
+    ids=[
+        "http-503",
+        "http-404",
+        "connection-refused",
+        "timeout",
+        "no-choices",
+        "empty-choices",
+        "content-not-json",
+        "content-not-an-object",
+        "body-not-json",
+    ],
 )
 def test_backend_failures_raise_llm_error(handler) -> None:
     with pytest.raises(LLMError):

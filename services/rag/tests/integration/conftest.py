@@ -63,9 +63,7 @@ def llm_settings(configured: Settings, ollama_models: set[str]) -> LLMSettings:
 
 
 @pytest.fixture(scope="session")
-def live_settings(
-    configured: Settings, embedding_settings: EmbeddingSettings, llm_settings: LLMSettings, qdrant_url: str
-) -> Iterator[Settings]:
+def live_settings(configured: Settings, embedding_settings: EmbeddingSettings, llm_settings: LLMSettings, qdrant_url: str) -> Iterator[Settings]:
     """The real config, pointed at the local servers and at a collection of its own (deleted afterwards)."""
     from qdrant_client import QdrantClient
 

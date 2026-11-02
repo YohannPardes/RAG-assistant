@@ -78,6 +78,4 @@ def test_every_chunk_of_the_txt_runbook_has_a_section(fixtures_dir) -> None:
     chunks = Chunker(max_length=1000).chunk_elements(Document(source=raw.source, elements=elements))
 
     assert all(chunk.heading_path for chunk in chunks)
-    assert {"1. SYMPTOMS", "3.2 Is a dependency slow?", "4. REMEDIATION", "5. ESCALATION"} <= {
-        chunk.heading_path[-1] for chunk in chunks
-    }
+    assert {"1. SYMPTOMS", "3.2 Is a dependency slow?", "4. REMEDIATION", "5. ESCALATION"} <= {chunk.heading_path[-1] for chunk in chunks}
