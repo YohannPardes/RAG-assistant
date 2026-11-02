@@ -84,9 +84,9 @@ rag_project/
 │   │   ├── chat/         base.py  fake.py                  INTERFACE + ADAPTERS  ChatEngine and its turn contract (the real engine comes with the graph)
 │   │   ├── drafts.py           CORE    DraftSigner: HMAC-signed ticket drafts for POST /tickets
 │   │   ├── runs.py             CORE    TriageRuns: a queue of 5, one worker running them in order, the last 50 kept in memory
-│   │   ├── cli.py              ENTRY   for a scheduler
-│   │   ├── container.py        ROOT
-│   │   ├── config.py           ROOT    env settings (read only by container)
+│   │   ├── cli.py              ENTRY   one run for a scheduler, the eval or by hand: --since --until [--dry-run] [--report] [--log]
+│   │   ├── container.py        ROOT    build_job: the triage job (model, rag, tickets or a dry-run sink, log file), for the CLI and the API
+│   │   ├── config.py           ROOT    settings: config.yaml (rag, tickets, llm, triage budgets, logs, api), secrets from env / .env
 │   │   ├── triage.py           CORE    run_triage: [since, until) → events → windows → one TriageWindow call each → TriageReport
 │   │   ├── agent.py            FLOW    TriageAgent: the window's LangGraph graph, diagnose ⇄ tools until create_ticket or dismiss (agent/4); logs each window's full transcript
 │   │   ├── models.py           CORE    LogEvent, Window and its stable id (agent/9)
