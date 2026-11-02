@@ -35,7 +35,7 @@ def test_a_question_retrieves_its_runbook_first(ingested: Settings, question: st
 
 
 def test_ingesting_again_does_not_duplicate_anything(ingested: Settings, ingest_script, fixtures_dir) -> None:
-    # running the job twice (a cron, a retry) must leave the store as one run does (rag/3, rag/12)
+    # running the job twice (a cron, a retry) must leave the store as one run does
     from siteops_rag.container import build_pipeline
 
     rag = build_rag(ingested)

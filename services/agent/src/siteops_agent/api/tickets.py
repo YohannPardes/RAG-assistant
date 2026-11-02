@@ -18,7 +18,7 @@ def router(sink: TicketSink | None, drafts: DraftSigner) -> APIRouter:
 
     @routes.post("/tickets")
     def confirm(request: ConfirmTicket) -> CreateTicketResult:
-        """File a drafted ticket. `created: false` means it was already open (the tickets service's dedup, agent/3)."""
+        """File a drafted ticket. `created: false` means it was already open (the tickets service deduplicates by fingerprint)."""
         if sink is None:
             raise ApiError(503, "tickets_disabled", "no tickets service is configured")
         try:

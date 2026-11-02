@@ -1,4 +1,4 @@
-"""What the triage model reads (agent/4, agent/10): its instructions, one window and any context it asks for, numbered.
+"""What the triage model reads: its instructions, one window and any context it asks for, numbered.
 
 Line numbers are defined here and nowhere else (`ShownLines`): the model cites evidence by number, and the checks
 and the ticket builder turn a number back into the event it was shown as.
@@ -36,7 +36,7 @@ Always answer with a tool call, never in plain text. If a call is rejected, read
 
 class ShownLines:
     """Every log line shown to the model for one window, numbered: the window's lines are 1 to N, in order, and each
-    log_context result continues the numbering (agent/14). A line shown again keeps its first number."""
+    log_context result continues the numbering. A line shown again keeps its first number."""
 
     def __init__(self, window: Window) -> None:
         self.window = window

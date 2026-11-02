@@ -31,7 +31,7 @@ def test_it_takes_the_closest_matches_before_every_one_during_and_the_first_afte
 
 
 def test_another_hosts_events_during_the_window_are_found() -> None:
-    # the pg_primary_down case: an API-host window, the cause logged by the replica (agent/14)
+    # the pg_primary_down case: an API-host window, the cause logged by the replica
     log = [ev(1, "api-01", "POST 500"), ev(1.5, "db-replica-02", "leader db-primary-01 unreachable", "WARN", "patroni"), ev(2, "api-01", "POST 500")]
 
     result = LogContext(log).around(window_over(1, 2, host="api-01"), LogQuery(host="db-replica-02", before=0, after=0))
@@ -58,7 +58,7 @@ def test_filters(query, expected) -> None:
 
 
 def test_the_pattern_is_searched_in_the_message_not_the_whole_line() -> None:
-    # format-agnostic (agent/13): the model needn't know where the host or level sit in a raw line
+    # format-agnostic: the model needn't know where the host or level sit in a raw line
     log = [ev(1, "db-replica-02", "ok")]
 
     assert LogContext(log).around(window_over(0, 2), LogQuery(pattern="db-replica")).events == ()

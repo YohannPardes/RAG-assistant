@@ -1,4 +1,4 @@
-"""scripts/generate_logs.py: the triage eval's input and ground truth (scope/2, scope/4), and its agreement with the parser.
+"""scripts/generate_logs.py: the triage eval's input and ground truth, and its agreement with the parser.
 
 The script is loaded by conftest.py.
 """
@@ -104,7 +104,7 @@ def test_a_silenced_host_logs_no_normal_noise_during_its_fault(generated, fault_
 
 
 def test_every_seeded_fault_type_is_one_a_ticket_can_carry(generate_logs) -> None:
-    # the eval matches a ticket's fault_type to the ground truth's (scope/4): the two lists must agree
+    # the eval matches a ticket's fault_type to the ground truth's: the two lists must agree
     assert {f.fault_type for f in generate_logs.FAULTS} == set(get_args(FaultType)) - {"other"}
 
 

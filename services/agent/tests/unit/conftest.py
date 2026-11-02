@@ -21,7 +21,7 @@ def generate_logs() -> ModuleType:
     return module
 
 
-WINDOW_LINES = [  # pg_primary_down seen from the replica (scope/2): the root-cause host is only named in messages
+WINDOW_LINES = [  # pg_primary_down seen from the replica: the root-cause host is only named in messages
     "2026-11-01T09:31:00.000Z INFO db-replica-02 pg-monitor: replica lag 2 MB, replay_lag 0.4s",
     "2026-11-01T09:31:11.000Z WARN db-replica-02 patroni: Request failed to db-primary-01: GET http://10.0.4.21:8008/patroni (Connection refused)",
     "2026-11-01T09:31:31.000Z WARN db-replica-02 patroni: leader db-primary-01 unreachable; no automatic failover, cluster paused",

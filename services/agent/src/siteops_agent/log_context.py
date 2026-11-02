@@ -1,6 +1,6 @@
-"""More log events around a window, for the model's log_context tool (agent/14). Pure: no I/O, no LLM.
+"""More log events around a window, for the model's log_context tool. Pure: no I/O, no LLM.
 
-The query is on LogEvent fields, never on raw lines, so it works whatever the log source and format (agent/13).
+The query is on LogEvent fields, never on raw lines, so it works whatever the log source and format.
 It reads only the events this run already read: the same range read twice gives the same context.
 """
 

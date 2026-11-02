@@ -1,4 +1,4 @@
-"""HTTP entry point of the agent (agent/8, agent/15): one router per area, assembled here. Routes only.
+"""HTTP entry point of the agent: one router per area, assembled here. Routes only.
 
   health.py   GET  /health                   no key
   meta.py     GET  /meta                     what the frontend offers and hides
@@ -8,7 +8,7 @@
   windows.py  GET  /windows                  the prefilter's windows for a range
 
 The work is done by objects built in container.py and passed in as `ApiParts`. Every route but /health needs
-`Authorization: Bearer <AGENT_API__API_KEY>` (agent/5), and every error is `{"detail", "code"}` (errors.py).
+`Authorization: Bearer <AGENT_API__API_KEY>`, and every error is `{"detail", "code"}` (errors.py).
 Handlers are plain `def`: FastAPI runs them in a thread, off the event loop, so the synchronous engine and graph
 (and the MCP sink's own event loop) never run on the server's loop.
 """

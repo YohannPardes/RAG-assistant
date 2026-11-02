@@ -6,8 +6,8 @@ from siteops_common.contracts import CreateTicketResult, Ticket, TicketCreate, f
 
 
 class MemoryTicketSink(TicketSink):
-    """Tickets kept in memory, deduplicated as the tickets service does (agent/3): the same fingerprint (from `common`,
-    arch/4) and the same window. The fake for tests, and the sink of `--dry-run`: nothing is filed anywhere."""
+    """Tickets kept in memory, deduplicated as the tickets service does: the same fingerprint (from `common`)
+    and the same window. The fake for tests, and the sink of `--dry-run`: nothing is filed anywhere."""
 
     def __init__(self, dedup_window: timedelta = timedelta(minutes=60), now: Callable[[], datetime] = lambda: datetime.now(UTC)) -> None:
         self.dedup_window = dedup_window

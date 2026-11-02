@@ -1,4 +1,4 @@
-"""SQLite ticket store with fingerprint deduplication (agent/3)."""
+"""SQLite ticket store with fingerprint deduplication."""
 
 import sqlite3
 import uuid

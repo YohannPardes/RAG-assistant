@@ -73,7 +73,7 @@ class QdrantVectorStore(VectorStore):
         self._delete_stale(chunks)
 
     def _delete_stale(self, chunks: list[Chunk]) -> None:
-        """Delete the chunks of the given chunks' sources that are not among them (rag/12)."""
+        """Delete the chunks of the given chunks' sources that are not among them."""
         stale_filter = models.Filter(
             must=[models.FieldCondition(key="source", match=models.MatchAny(any=list({chunk.source for chunk in chunks})))],
             must_not=[models.HasIdCondition(has_id=[chunk.chunk_id for chunk in chunks])],

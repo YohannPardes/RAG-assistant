@@ -1,4 +1,4 @@
-"""Contract tests: one suite written against `TicketSink`, run once per implementation (tooling/5).
+"""Contract tests: one suite written against `TicketSink`, run once per implementation.
 
 The MCP sink runs against the stand-in server of conftest.py, whose dedup is the memory sink's: what this suite
 checks is that both sinks give the agent the same answers, over the wire or not.
@@ -77,7 +77,7 @@ def test_after_the_window_the_same_fault_is_a_new_ticket(sink) -> None:
     tickets, advance = sink
     first = tickets.create(TICKET)
 
-    advance(timedelta(minutes=60))  # agent/3: created in the last 60 minutes, so exactly 60 is outside
+    advance(timedelta(minutes=60))  # a duplicate is one created in the last 60 minutes, so exactly 60 is outside
 
     later = tickets.create(TICKET)
 

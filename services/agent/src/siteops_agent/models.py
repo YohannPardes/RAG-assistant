@@ -11,7 +11,7 @@ LEVELS: frozenset[str] = frozenset(get_args(Level))
 
 @dataclass(frozen=True)
 class LogEvent:
-    """One parsed log line (agent/9). No judgement on whether it matters: that is the prefilter's job."""
+    """One parsed log line. No judgement on whether it matters: that is the prefilter's job."""
 
     time: datetime  # timezone-aware, UTC
     host: str
@@ -29,7 +29,7 @@ class LogEvent:
 
 @dataclass(frozen=True)
 class Window:
-    """Where the LLM should look: one host, one rule, a bounded run of events (agent/9)."""
+    """Where the LLM should look: one host, one rule, a bounded run of events."""
 
     host: str
     rule: str  # which rule fired: a hint for the agent, not a verdict
@@ -41,6 +41,6 @@ class Window:
     @property
     def id(self) -> str:
         """Stable across runs: the same host, rule and span give the same id, so a window can be rerun alone
-        and its trace joined to the report (agent/4). The prefilter is pure, so rereading a range gives the same ids."""
+        and its trace joined to the report. The prefilter is pure, so rereading a range gives the same ids."""
         key = f"{self.host}|{self.rule}|{self.start.isoformat()}|{self.end.isoformat()}"
         return hashlib.sha256(key.encode()).hexdigest()[:12]

@@ -1,4 +1,4 @@
-"""What the triage model decides for a window, and the checks that turn it into a ticket (agent/10).
+"""What the triage model decides for a window, and the checks that turn it into a ticket.
 
 The model fills the judgement (`TicketDraft`, `Dismissal`); code checks it against the lines it was shown and the
 searches it made (`check_draft`), then fills the facts (`to_ticket_create`). These models are the narrow tools' schemas:
@@ -45,7 +45,7 @@ class Dismissal(_Decision):
 def check_draft(draft: TicketDraft, shown: ShownLines, retrieved: Mapping[str, SearchHit], known_hosts: Set[str]) -> list[str]:
     """What is wrong with the draft, written for the model to correct; empty when it can become a ticket.
 
-    `shown` holds every line shown for this window (the window and any context, agent/14);
+    `shown` holds every line shown for this window (the window and any lines log_context added);
     `retrieved` the hits of the searches made for it, by chunk_id; `known_hosts` every host that wrote a line in
     the run, so a service named in a message ("orders-db") can't pass for the server at fault.
     """
@@ -62,7 +62,7 @@ def check_draft(draft: TicketDraft, shown: ShownLines, retrieved: Mapping[str, S
 
 
 def to_ticket_create(draft: TicketDraft, shown: ShownLines, retrieved: Mapping[str, SearchHit], known_hosts: Set[str]) -> TicketCreate:
-    """The ticket for a checked draft: the model's judgement plus the facts, which code fills (agent/10)."""
+    """The ticket for a checked draft: the model's judgement plus the facts, which code fills."""
     if problems := check_draft(draft, shown, retrieved, known_hosts):
         raise ValueError(f"the draft fails its checks: {problems}")
     numbers = list(dict.fromkeys(draft.evidence_lines))  # the model's order, each line once

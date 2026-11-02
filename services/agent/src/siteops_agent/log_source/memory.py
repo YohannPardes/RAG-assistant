@@ -6,7 +6,7 @@ from siteops_agent.models import LogEvent
 
 
 class MemoryLogSource(LogSource):
-    """Events held in memory (the fake, design/1): tests build them directly, without a file or a parser."""
+    """Events held in memory (the fake for tests): tests build them directly, without a file or a parser."""
 
     def __init__(self, events: Iterable[LogEvent], unparsable: int = 0) -> None:
         self._batch = LogBatch(tuple(events), unparsable)

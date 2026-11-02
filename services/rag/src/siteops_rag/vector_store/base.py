@@ -26,7 +26,7 @@ class VectorStore(ABC):
     def upsert(self, chunks: list[Chunk], embeddings: Embeddings) -> None:
         """Upsert the given chunks and their corresponding vectors into the store.
 
-        The chunks are the complete set for their sources: a source's other chunks are deleted (rag/12).
+        The chunks are the complete set for their sources: a source's other chunks are deleted.
         """
         if embeddings.model != self.embedding_model:
             raise ValueError(f"store holds {self.embedding_model!r} vectors, got {embeddings.model!r}")

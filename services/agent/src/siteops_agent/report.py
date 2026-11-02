@@ -1,4 +1,4 @@
-"""What a triage run reports (agent/4): one outcome per window, so the eval can score it and a miss can be traced.
+"""What a triage run reports: one outcome per window, so the eval can score it and a miss can be traced.
 
 The eval reads it instead of the tickets store: each outcome keeps its window's host, rule and span, so a missed
 fault is blamed on the prefilter (no window overlaps it) or on the model (a window did, and was dismissed or misdiagnosed).
@@ -14,9 +14,9 @@ from siteops_agent.models import Window
 
 Status = Literal[
     "ticketed",  # a new ticket was opened
-    "deduplicated",  # create_ticket returned an existing ticket (agent/3)
+    "deduplicated",  # create_ticket returned an existing ticket
     "dismissed",  # the model closed the window without a ticket
-    "unresolved",  # the window's budget ran out with no decision: never ticketed (agent/4)
+    "unresolved",  # the window's budget ran out with no decision: never ticketed
     "error",  # a call failed (rag, tickets, the model): the window was not decided
 ]
 
@@ -100,7 +100,7 @@ class TriageReport(_Report):
     until: AwareDatetime
     model: str  # the model that decided: runs are compared per model
     events_read: int
-    unparsable: int  # a jump in it is itself a signal (agent/9)
+    unparsable: int  # a jump in it is itself a signal
     outcomes: list[WindowOutcome]
 
     @computed_field  # type: ignore[prop-decorator]  # pydantic's documented pattern; mypy can't type a decorated property

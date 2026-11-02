@@ -1,4 +1,4 @@
-"""Configuration of the agent service. Two sources, which never hold the same key (design/4):
+"""Configuration of the agent service. Two sources, which never hold the same key:
 
   - YAML file         services/agent/config.yaml (committed; another file with AGENT_CONFIG_FILE): every setting but secrets
   - env vars, .env    AGENT_TICKETS__API_KEY=... (.env: services/agent/.env, never committed; env vars win): secrets only
@@ -72,7 +72,7 @@ class RagClientSettings(_Section):
 
 class TicketSinkSettings(_Section):
     url: str
-    api_key: SecretStr = Field(min_length=16)  # the tickets service's TICKETS_API_KEY (agent/5)
+    api_key: SecretStr = Field(min_length=16)  # the tickets service's TICKETS_API_KEY
     timeout: float = Field(gt=0)
     retries: int = Field(ge=0)
 
@@ -80,8 +80,8 @@ class TicketSinkSettings(_Section):
 class ApiSettings(_Section):
     host: str
     port: int = Field(gt=0, lt=65536)
-    # agent/5: what callers of the agent's own API must send. Only `api.py` needs it, so the CLI runs without it;
-    # the API refuses to start without one (no default stands in for it, design/4)
+    # what callers of the agent's own API must send (a bearer token). Only `api.py` needs it, so the CLI runs
+    # without it; the API refuses to start without one (no default stands in for a secret)
     api_key: SecretStr | None = Field(default=None, min_length=16)
 
 

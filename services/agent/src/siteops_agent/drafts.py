@@ -1,6 +1,6 @@
-"""Signed ticket drafts (agent/15): how a chat-drafted ticket reaches POST /tickets without the agent keeping state.
+"""Signed ticket drafts: how a chat-drafted ticket reaches POST /tickets without the agent keeping state.
 
-The token carries the whole TicketCreate the code built (agent/10: evidence text, window times, runbook reference) and
+The token carries the whole TicketCreate the code built (the evidence text, window times, runbook reference) and
 an expiry, signed with HMAC-SHA256. The browser can show it but can't change it: any edit breaks the signature.
 """
 

@@ -1,11 +1,11 @@
 """Configuration of the rag service.
 
-Two sources, which never hold the same key (design/4):
+Two sources, which never hold the same key:
   - YAML file         services/rag/config.yaml (committed; another file with RAG_CONFIG_FILE): every setting but secrets
   - env vars, .env    RAG_LLM__API_KEY=... (.env: services/rag/.env, never committed; env vars win): secrets only
 
 A secret in the YAML, or another setting in env vars or .env, is an error. So is a setting missing from the YAML:
-the only code defaults are the API keys (local model servers ignore them) and retrieval.top_k (rag/7).
+the only code defaults are the API keys (local model servers ignore them) and retrieval.top_k.
 
 Only the composition root (container.py) reads Settings; adapters receive plain values.
 """
@@ -99,7 +99,7 @@ class ChunkingSettings(_Section):
 
 
 class RetrievalSettings(_Section):
-    top_k: int = Field(default=10, ge=1, le=50)  # chunks retrieved when a request sends no top_k (rag/7)
+    top_k: int = Field(default=10, ge=1, le=50)  # chunks retrieved when a request sends no top_k
 
 
 class VectorStoreSettings(_Section):

@@ -72,7 +72,7 @@ def test_a_numbered_step_spanning_several_lines_is_not_a_heading() -> None:
 
 
 def test_every_chunk_of_the_txt_runbook_has_a_section(fixtures_dir) -> None:
-    # without one, a chunk can't be cited by section and never matches a golden-set label (scope/4)
+    # without one, a chunk can't be cited by section and never matches a golden-set label
     raw = RawDocument("runbook_high_latency.txt", (fixtures_dir / "runbook_high_latency.txt").read_bytes(), "text/plain")
     elements = TextMarkdownConverter().convert_to_elements(raw)
     chunks = Chunker(max_length=1000).chunk_elements(Document(source=raw.source, elements=elements))

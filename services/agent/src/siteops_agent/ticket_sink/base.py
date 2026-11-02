@@ -8,9 +8,9 @@ class TicketSinkError(Exception):
 
 
 class TicketSink(ABC):
-    """Where the agent files tickets: its only side effect (agent/1)."""
+    """Where the agent files tickets: its only side effect."""
 
     @abstractmethod
     def create(self, ticket: TicketCreate) -> CreateTicketResult:
-        """The new ticket (created=True), or the recent one with the same fingerprint (created=False, agent/3).
+        """The new ticket (created=True), or the recent one with the same fingerprint (created=False: deduplicated).
         Raises TicketSinkError when the ticket could not be filed."""

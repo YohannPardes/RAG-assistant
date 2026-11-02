@@ -9,7 +9,7 @@ from siteops_rag.ingestion.pipeline import RAGIngestionPipeline
 
 @pytest.fixture
 def pipeline(embedder, store) -> RAGIngestionPipeline:
-    # 90 characters: each paragraph below is its own chunk, after its "<filename>\n\n" prefix (rag/14)
+    # 90 characters: each paragraph below is its own chunk, after its "<filename>\n\n" prefix
     return RAGIngestionPipeline(converter=TextMarkdownConverter(), chunker=Chunker(max_length=90), embedder=embedder, vector_store=store)
 
 
@@ -55,7 +55,7 @@ def test_edited_document_replaces_its_old_chunks(pipeline, store, embedder) -> N
 
     pipeline.run(txt("runbook_high_latency.txt", "The p99 latency alert fires above 800 ms.\n\nScale the api deployment up."))
 
-    # rag/12: the removed step no longer comes back in search results
+    # re-ingesting replaces the document: the removed step no longer comes back in search results
     assert stored(store, embedder) == {
         "runbook_high_latency.txt": ["Scale the api deployment up.", "The p99 latency alert fires above 800 ms."]
     }

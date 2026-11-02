@@ -1,4 +1,4 @@
-"""Composition root (design/3): the only module that reads Settings and picks the adapters."""
+"""Composition root: the only module that reads Settings and picks the adapters."""
 
 from siteops_rag.config import Settings
 from siteops_rag.embedder.openai_compat import OpenAICompatEmbedder

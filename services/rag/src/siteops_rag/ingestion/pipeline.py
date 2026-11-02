@@ -30,7 +30,7 @@ class RAGIngestionPipeline:
         document = Document(source=raw_document.source, elements=tuple(elements))
         chunks = self.chunker.chunk_elements(document)
         if not chunks:
-            # an emptied document sends no chunks, so upsert can't clean it up (rag/12)
+            # an emptied document sends no chunks, so upsert can't clean it up
             self.vector_store.delete_by_source(raw_document.source)
             return
 

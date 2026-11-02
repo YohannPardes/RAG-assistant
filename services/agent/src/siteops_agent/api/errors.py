@@ -1,7 +1,7 @@
-"""One error shape for every route (agent/15): `{"detail": "…", "code": "…"}`.
+"""One error shape for every route: `{"detail": "…", "code": "…"}`.
 
 `code` is stable and machine-readable (the frontend branches on it); `detail` is for people. 422: the request is
-invalid; 502 / 504: a service we depend on is down or slow (arch/7); 503: we are at capacity.
+invalid; 502 / 504: a service we depend on is down or slow; 503: we are at capacity.
 """
 
 from typing import Any

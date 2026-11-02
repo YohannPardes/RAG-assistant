@@ -8,7 +8,7 @@ from siteops_agent.api.errors import body
 
 
 class ApiKeyMiddleware:
-    """Every HTTP request but /health must carry `Authorization: Bearer <key>` (agent/5); compared in constant time."""
+    """Every HTTP request but /health must carry `Authorization: Bearer <key>`; compared in constant time."""
 
     def __init__(self, app: ASGIApp, api_key: str) -> None:
         self.app = app

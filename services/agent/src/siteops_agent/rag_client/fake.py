@@ -5,7 +5,7 @@ from siteops_common.contracts import SearchHit, SearchRequest, SearchResponse
 
 
 class FakeRagClient(RagClient):
-    """Returns the same hits, best first, for every query (the fake, design/1). Records the requests it got."""
+    """Returns the same hits, best first, for every query (the fake for tests). Records the requests it got."""
 
     def __init__(self, hits: Sequence[SearchHit] = (), error: RagError | None = None) -> None:
         self.hits = list(hits)

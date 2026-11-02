@@ -15,7 +15,7 @@ pytestmark = pytest.mark.integration
 
 @pytest.fixture
 def client(ingested: Settings, monkeypatch, tmp_path) -> Iterator[TestClient]:
-    # how a deployment points the service at its neighbours: a config file of its own (design/4)
+    # how a deployment points the service at its neighbours: a config file of its own
     config = ingested.model_dump(mode="json", exclude={"embedding": {"api_key"}, "llm": {"api_key"}})
     config_file = tmp_path / "config.yaml"
     config_file.write_text(yaml.safe_dump(config))

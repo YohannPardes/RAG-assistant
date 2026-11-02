@@ -1,4 +1,4 @@
-"""Synthetic site logs with seeded faults (scope/2): the triage agent's input and the eval's ground truth.
+"""Synthetic site logs with seeded faults: the triage agent's input and the eval's ground truth.
 
 Writes data/logs/site.log (normal noise from fake hosts, harmless one-off warnings, seeded faults) and
 data/logs/ground_truth.json (one entry per seeded fault: type, host, affected hosts, start, end, expected runbook).
@@ -120,7 +120,7 @@ HOSTS: dict[str, tuple[float, Noise]] = {  # host → mean seconds between lines
 class Fault:
     fault_type: str
     host: str  # where the fault is (root cause); other hosts may log its effects
-    affected_hosts: tuple[str, ...]  # every host whose lines show the fault, `host` first (scope/4's matching rule)
+    affected_hosts: tuple[str, ...]  # every host whose lines show the fault, `host` first: a ticket naming any of them matches the fault
     expected_runbook: str  # `source` of the runbook, as rag /search returns it
     emit: Callable[[random.Random, datetime, datetime], list[Line]]
     silences: tuple[str, ...]  # hosts whose normal noise stops during the fault (host down, or its lines replaced)

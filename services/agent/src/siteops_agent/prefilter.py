@@ -1,6 +1,6 @@
-"""Prefilter (agent/9): selects where the LLM looks. Pure: same events → same windows; no I/O, no LLM.
+"""Prefilter: selects where the LLM looks. Pure: same events → same windows; no I/O, no LLM.
 
-The rules are agent/12's. Each event goes to the first rule that matches it; a rule's matches on one host
+The rules are RULES below. Each event goes to the first rule that matches it; a rule's matches on one host
 form windows, which get a little context from the same host.
 """
 
@@ -50,7 +50,7 @@ def _rule(name: str, pattern: str, min_level: Level, within_minutes: int, compon
     return Rule(name=name, pattern=re.compile(pattern), components=found_in, min_level=min_level, min_count=min_count, within=within)
 
 
-RULES: tuple[Rule, ...] = (  # agent/12, in order: specific before generic, the catch-all last
+RULES: tuple[Rule, ...] = (  # in order: specific before generic, the catch-all last
     _rule("db_leader_unreachable", r"unreachable|Connection refused|no automatic failover", "WARN", 10, components="patroni"),
     _rule("db_write_failed", r"write failed|recovery mode", "ERROR", 5, components="public-api"),
     _rule("tls_certificate", r"certificate has expired|x509|SSL_do_handshake\(\) failed|renewal failed", "WARN", 10),
