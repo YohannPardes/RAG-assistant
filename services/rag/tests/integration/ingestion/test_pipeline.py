@@ -41,6 +41,6 @@ def test_ingesting_again_does_not_duplicate_anything(ingested: Settings, ingest_
     rag = build_rag(ingested)
     before = rag.vector_store.count()
 
-    build_pipeline(ingested).run_batch(ingest_script.load_documents(fixtures_dir))
+    build_pipeline(ingested).run_batch(ingest_script.load_documents(fixtures_dir)[0])
 
     assert rag.vector_store.count() == before

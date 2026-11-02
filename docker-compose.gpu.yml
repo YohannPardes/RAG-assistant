@@ -1,0 +1,17 @@
+# Ollama itself in the stack, on an NVIDIA GPU, instead of the forwarder to the host's: make up-gpu
+# (docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d), then make models once.
+services:
+  ollama:
+    image: ollama/ollama:0.40.6
+    entrypoint: ["/bin/ollama"]
+    command: ["serve"]
+    volumes:
+      - ollama-models:/root/.ollama          # the pulled models survive `down` (not `down -v`)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - { driver: nvidia, count: all, capabilities: [gpu] }
+
+volumes:
+  ollama-models:

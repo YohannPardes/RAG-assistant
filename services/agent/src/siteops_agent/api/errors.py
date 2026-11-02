@@ -1,6 +1,6 @@
 """One error shape for every route: `{"detail": "…", "code": "…"}`.
 
-`code` is stable and machine-readable (the frontend branches on it); `detail` is for people. 422: the request is
+`code` is stable and machine-readable (clients branch on it); `detail` is for people. 422: the request is
 invalid; 502 / 504: a service we depend on is down or slow; 503: we are at capacity.
 """
 
@@ -37,7 +37,7 @@ def install(app: FastAPI) -> None:
 
 
 def _describe(errors: Any) -> str:
-    """Pydantic's errors as one line the frontend can show next to the input: "body.until: until must be after since"."""
+    """Pydantic's errors as one line a client can show next to the input: "body.until: until must be after since"."""
     parts = []
     for error in errors:
         location = ".".join(str(part) for part in error.get("loc", ()))

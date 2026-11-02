@@ -20,7 +20,12 @@ Every service has its own `Dockerfile`, built with the repo root as build contex
 
 ```
 rag_project/
-├── pyproject.toml   uv.lock   .python-version   Makefile   docker-compose.yml   README.md   AGENTS.md   CLAUDE.md (imports AGENTS.md)
+├── pyproject.toml   uv.lock   .python-version   README.md   AGENTS.md   CLAUDE.md (imports AGENTS.md)
+├── Makefile                   make help: the stack (up, up-gpu, down, ingest, triage…) and the dev checks
+├── docker-compose.yml         ollama (a forwarder to the host's model server), qdrant, rag, tickets, agent; the ingest job
+├── docker-compose.gpu.yml     make up-gpu: Ollama itself in the stack, on the GPU
+├── .env.example               what compose reads: the two API keys, optional LLM_UPSTREAM and host ports
+├── .dockerignore              what no image build sees: .env files, tests, data, .venv, .git
 ├── .github/workflows/ci.yml    CI on push / PR
 ├── docs/DECISIONS.md
 │
@@ -60,7 +65,7 @@ rag_project/
 │       ├── integration/            marked `integration`; run with `pytest -m integration`; skips what isn't running
 │       │   ├── conftest.py         docling_converter, Ollama and live settings, `ingested` (fixtures ingested once)
 │       │   ├── test_api.py         real lifespan: /search, /ask answered and "I don't know"
-│       │   ├── test_golden_set.py  every golden-set label names a section that ingesting data/runbooks produces
+│       │   ├── test_golden_set.py  every golden-set label names a section that ingesting data/ produces
 │       │   ├── converter/test_docling.py
 │       │   ├── embedder/test_ollama.py   llm/test_ollama.py
 │       │   ├── ingestion/test_pipeline.py
@@ -71,21 +76,18 @@ rag_project/
 │           └── images/                    diagrams (cert_renewal.png is referenced by the .md)
 │
 ├── services/agent/
-│   ├── pyproject.toml   Dockerfile   config.yaml   .env.example
+│   ├── pyproject.toml   Dockerfile   config.yaml   config.docker.yaml (the image's)   .env.example
 │   ├── src/siteops_agent/
 │   │   ├── api/                ENTRY   one router per area, assembled in app.py (agent/15)
 │   │   │   ├── app.py          ApiParts, build_app: the routers, the key check, the error shape
 │   │   │   ├── auth.py  errors.py     API key (agent/5); {"detail", "code"} for every error
-│   │   │   ├── chat.py         POST /chat: one stateless turn; signs drafted tickets
-│   │   │   ├── tickets.py      POST /tickets: confirm a signed draft
 │   │   │   ├── triage.py       POST /triage (202 queued, 503 when full), GET /triage[/{run_id}]
 │   │   │   ├── windows.py      GET /windows: the prefilter's windows, counts only
-│   │   │   └── meta.py  health.py     GET /meta, GET /health
-│   │   ├── chat/         base.py  fake.py                  INTERFACE + ADAPTERS  ChatEngine and its turn contract (the real engine comes with the graph)
-│   │   ├── drafts.py           CORE    DraftSigner: HMAC-signed ticket drafts for POST /tickets
+│   │   │   ├── health.py       GET /health
+│   │   │   └── main.py         starts the service: uv run python -m siteops_agent.api.main
 │   │   ├── runs.py             CORE    TriageRuns: a queue of 5, one worker running them in order, the last 50 kept in memory
 │   │   ├── cli.py              ENTRY   one run for a scheduler, the eval or by hand: --since --until [--dry-run] [--report] [--log]
-│   │   ├── container.py        ROOT    build_job: the triage job (model, rag, tickets or a dry-run sink, log file), for the CLI and the API
+│   │   ├── container.py        ROOT    build_job: the triage job (model, rag, tickets or a dry-run sink, log file); build_api: the service
 │   │   ├── config.py           ROOT    settings: config.yaml (rag, tickets, llm, triage budgets, logs, api), secrets from env / .env
 │   │   ├── triage.py           CORE    run_triage: [since, until) → events → windows → one TriageWindow call each → TriageReport
 │   │   ├── agent.py            FLOW    TriageAgent: the window's LangGraph graph, diagnose ⇄ tools until create_ticket or dismiss (agent/4); logs each window's full transcript
@@ -107,10 +109,10 @@ rag_project/
 │           ├── conftest.py              generate_logs (the generator script, loaded from its path), a window and its search hits
 │           ├── test_generated_logs.py   scripts/generate_logs.py: determinism, fault windows, decoys, ground truth, every line parses
 │           ├── test_models.py           LogEvent / Window: frozen and hashable, Window.id
-│           ├── test_prompts.py  test_decision.py  test_report.py  test_config.py  test_log_context.py  test_triage_tools.py  test_runs.py  test_drafts.py
+│           ├── test_prompts.py  test_decision.py  test_report.py  test_config.py  test_log_context.py  test_triage_tools.py  test_runs.py
+│           ├── test_container.py        the service built from the real config.yaml: routes behind the key, /windows
 │           ├── test_agent.py            the routers' table; whole windows with a scripted model (decisions, retry, reminder, budget, errors); the logged transcript
-│           ├── api/                 conftest.py (the API on fakes)  test_app.py  test_chat.py  test_tickets.py  test_triage.py  test_windows.py  test_meta.py
-│           ├── chat/test_base.py    the turn contract: markers, offsets, proposals
+│           ├── api/                 conftest.py (the API on fakes)  test_app.py  test_triage.py  test_windows.py
 │           ├── test_prefilter.py        matching, merging, thresholds, context, cap, order; agent/12's recall on generated logs
 │           ├── log_parser/test_syslog.py
 │           ├── log_source/          test_base.py (contract suite: memory + file)  test_file.py
@@ -131,8 +133,9 @@ rag_project/
 │       └── test_config.py      the real configs load; the key only from env / .env, settings only from the YAML
 │
 ├── tests/                      SYSTEM  cross-service only
+│   ├── test_stack.py           the stack's shared values agree: ports, service names, aliases, mounts, models
 │   ├── e2e/                    agent → rag → tickets for real: conftest.py (the tickets app on a local port)  test_agent_to_tickets.py  test_agent_to_rag.py
 │   └── eval/                   recall@5, triage precision/recall
 ├── scripts/                    ingest.py, generate_logs.py, run_eval.py
-└── data/                       runbooks/ (30 runbooks in md/txt/html/docx/pdf, read by scripts/ingest.py; the 4 fixture runbooks are copied from services/rag/tests/fixtures/), logs/ (site.log and ground_truth.json, written by scripts/generate_logs.py; site.log is git-ignored), golden_set.jsonl, eval_history.jsonl (one line per scripts/run_eval.py run)
+└── data/                       runbooks/ (30 runbooks in md/txt/html/docx/pdf; scripts/ingest.py reads all of data/, warns about the other files and names each runbook runbooks/<file>; the 4 fixture runbooks are copied from services/rag/tests/fixtures/), logs/ (site.log and ground_truth.json, written by scripts/generate_logs.py; site.log is git-ignored), golden_set.jsonl, eval_history.jsonl (one line per scripts/run_eval.py run)
 ```

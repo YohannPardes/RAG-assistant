@@ -1,0 +1,12 @@
+# What a docker build never sees. Every image is built from the repo root and copies only what it lists, but a COPY of a
+# service's folder takes all of it: without this, a local .env (secrets) or the tests would end up in the image.
+**/.env
+**/.venv
+**/__pycache__
+**/*.pyc
+**/tests
+.git
+.claude
+.github
+data
+docs
