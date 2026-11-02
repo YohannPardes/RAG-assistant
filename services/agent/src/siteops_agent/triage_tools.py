@@ -1,4 +1,4 @@
-"""One window's tools and memory: what the triage model can do while it investigates a window (agent/4, agent/10).
+"""One window's tools and memory: what the triage model can do while it investigates a window.
 
 The model sees only each tool's arguments and the text it returns. Everything else is here, out of its reach: the
 lines shown so far and their numbers, the runbook passages retrieved, the budgets, the clients. Plain Python, no
@@ -32,7 +32,7 @@ MAX_EVIDENCE: int = next(rule.max_length for rule in TicketDraft.model_fields["e
 
 @dataclass(frozen=True)
 class ToolLimits:
-    """The budgets of one window (agent/4). The values come from the config, through the composition root."""
+    """The budgets of one window. The values come from the config, through the composition root."""
 
     max_searches: int
     max_log_queries: int
@@ -60,7 +60,7 @@ class ToolReply:
 
 
 class ToolFailure(Exception):
-    """Our failure, not the model's: the window ends as "error" with this message (agent/4)."""
+    """Our failure, not the model's: the window ends as "error" with this message."""
 
     def __init__(self, service: str, message: str) -> None:
         super().__init__(f"{service}: {message}")
@@ -70,7 +70,7 @@ class ToolFailure(Exception):
 @dataclass(frozen=True)
 class Ticketed:
     draft: TicketDraft
-    result: CreateTicketResult  # result.created is False when the tickets service deduplicated it (agent/3)
+    result: CreateTicketResult  # result.created is False when the tickets service deduplicated it
 
 
 @dataclass(frozen=True)
@@ -127,7 +127,7 @@ class TriageTools:
         return ToolReply("\n\n".join(_render_hit(hit) for hit in hits))
 
     def log_context(self, args: Mapping[str, Any]) -> ToolReply:
-        """More log events around the window, from this run's events (agent/14). Its lines are numbered after the window's."""
+        """More log events around the window, from this run's events. Its lines are numbered after the window's."""
         if refused := self._refuse_when_decided():
             return refused
         if len(self.log_lookups) >= self.limits.max_log_queries:

@@ -16,10 +16,10 @@ class _Unreachable(Exception):
 
 
 class McpTicketSink(TicketSink):
-    """The tickets service's create_ticket tool over streamable HTTP (arch/6), with its API key (agent/5).
+    """The tickets service's create_ticket tool over streamable HTTP, with its API key.
 
-    A plain MCP client session: the model never sees this tool, only the agent's narrow one (agent/10).
-    Connection errors are retried (arch/7); a repeated create is harmless, since the service deduplicates it (agent/3).
+    A plain MCP client session: the model never sees this tool, only the agent's narrow one.
+    Connection errors are retried; a repeated create is harmless, since the service deduplicates it.
     Synchronous: call it from sync code, as it runs its own event loop per call.
     """
 

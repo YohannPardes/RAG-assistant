@@ -48,7 +48,7 @@ def test_top_k_defaults_to_10_without_a_retrieval_section(isolated_env) -> None:
     del data["retrieval"]
     isolated_env.write_text(yaml.safe_dump(data))
 
-    assert Settings(_env_file=None).retrieval.top_k == 10  # rag/7
+    assert Settings(_env_file=None).retrieval.top_k == 10  # the one setting with a code default
 
 
 def test_a_secret_comes_from_the_env_var_then_dotenv(isolated_env, tmp_path, monkeypatch) -> None:

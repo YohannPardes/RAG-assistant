@@ -9,7 +9,7 @@ from siteops_agent.prefilter import MAX_EVENTS, RULES, Rule, find_windows
 
 T0 = datetime(2026, 11, 1, 7, tzinfo=UTC)
 START = datetime(2026, 11, 1, 6, tzinfo=UTC)
-# the rule that must catch each seeded fault (agent/12)
+# the rule that must catch each seeded fault
 FAULT_RULES = {
     "disk_full": "disk_pressure",
     "pg_primary_down": "db_leader_unreachable",
@@ -115,7 +115,7 @@ def test_a_threshold_window_starts_at_the_run_that_reached_the_count() -> None:
 
 
 def test_an_event_a_threshold_rule_matched_does_not_fall_through_to_a_later_rule() -> None:
-    # agent/12: consumed even when the count is never reached
+    # the event is consumed even when the count is never reached
     windows = find_windows([ev(0, "boom", "ERROR")], [rule(min_count=3), rule("unknown", min_level="ERROR")])
 
     assert windows == []
@@ -231,7 +231,7 @@ def test_info_noise_gives_no_windows() -> None:
     assert find_windows([ev(i, "boom") for i in range(100)], RULES) == []
 
 
-# --- agent/12's rules on the generator's logs ---
+# --- RULES on the generator's logs ---
 
 
 P = "shop/checkout-worker-7d9f8-x2k4q"
@@ -264,7 +264,7 @@ P = "shop/checkout-worker-7d9f8-x2k4q"
     ],
 )
 def test_which_rule_takes_a_line(component, level, message, expected) -> None:
-    # the first matching rule takes the event (agent/12's order): e.g. a database outage on an API host is not a bad release
+    # the first matching rule takes the event (RULES' order): e.g. a database outage on an API host is not a bad release
     event = ev(0, message, level, component=component)
 
     assert next((r.name for r in RULES if r.matches(event)), None) == expected
@@ -295,7 +295,7 @@ def overlaps(window, start: datetime, end: datetime) -> bool:
 
 
 def test_every_seeded_fault_gets_a_window_from_its_rule(generated) -> None:
-    # prefilter recall is 1: a miss here can't be blamed on the LLM (scope/4)
+    # prefilter recall is 1: a miss here can't be blamed on the LLM
     windows, faults = generated
 
     for fault in faults:

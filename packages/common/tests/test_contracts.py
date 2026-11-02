@@ -149,7 +149,7 @@ def test_the_fingerprint_is_the_fault_type_on_its_host() -> None:
 
 
 def test_the_fingerprint_ignores_case_and_spaces_around_the_host() -> None:
-    # "the same fault" must not depend on how the agent wrote the host (agent/3)
+    # "the same fault" must not depend on how the agent wrote the host
     assert fingerprint("disk_full", "  LOG-02 ") == fingerprint("disk_full", "log-02")
 
 

@@ -38,7 +38,7 @@ def test_the_host_may_be_the_writer_or_named_in_a_line(window, hits, host) -> No
 
 
 def test_a_server_the_lines_shown_do_not_name_is_rejected(window, hits) -> None:
-    # an injected line can't make the agent file a ticket against an unrelated host (agent/10)
+    # an injected line can't make the agent file a ticket against an unrelated host
     [problem] = check_draft(draft(host="api-01"), ShownLines(window), hits, KNOWN)
 
     assert "does not appear" in problem
@@ -74,7 +74,7 @@ def test_every_problem_is_reported_at_once(window, hits) -> None:
 
 
 def test_a_host_named_only_in_fetched_context_is_accepted(window, hits) -> None:
-    # agent/14: an API-host window can name the primary once log_context has shown the replica's lines
+    # an API-host window can name the primary once log_context has shown the replica's lines
     api_window = dataclasses.replace(window, host="api-01", events=(dataclasses.replace(window.events[0], host="api-01", message="POST 500"),))
     shown = ShownLines(api_window)
 

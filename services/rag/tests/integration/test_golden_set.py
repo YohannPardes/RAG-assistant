@@ -1,5 +1,5 @@
 """Every golden-set label must name a section that ingestion really produces. A label no chunk carries
-scores as a retrieval miss forever, whatever the retriever does (scope/4)."""
+scores as a retrieval miss forever, whatever the retriever does."""
 
 import json
 from pathlib import Path

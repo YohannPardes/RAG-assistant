@@ -1,7 +1,7 @@
 services:
-  tickets:                                   # MCP server: create_ticket over streamable HTTP at /mcp (arch/6)
+  tickets:                                   # MCP server: create_ticket over streamable HTTP at /mcp
     build:
-      context: .                             # repo root: the image needs packages/common too (arch/4)
+      context: .                             # repo root: the image needs packages/common too
       dockerfile: services/tickets/Dockerfile
     environment:
       TICKETS_API_KEY: ${TICKETS_API_KEY:?set TICKETS_API_KEY (16+ characters) in the shell or in .env}

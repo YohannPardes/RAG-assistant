@@ -1,4 +1,4 @@
-"""Triage runs started over the API: queued, run one at a time by a worker thread, kept in memory (agent/8).
+"""Triage runs started over the API: queued, run one at a time by a worker thread, kept in memory.
 
 A run takes minutes (one LLM loop per window), longer than an HTTP request should wait: POST queues it and answers
 at once, GET reads how it is going. The work itself is the job, the same `run_triage` the CLI calls.

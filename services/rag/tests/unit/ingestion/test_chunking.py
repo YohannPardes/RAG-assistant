@@ -54,7 +54,7 @@ def test_content_before_the_title_is_under_the_title() -> None:
 
     paths = {_body(c.text): c.heading_path for c in _chunk(doc)}
 
-    assert paths["Read this first."] == ("RB-1",)  # rag/14: the document's identity, even before its title line
+    assert paths["Read this first."] == ("RB-1",)  # the document's identity, even before its title line
     assert paths["Intro."] == ("RB-1",)
     assert paths["Body."] == ("RB-1", "1. Scope")
 
@@ -89,7 +89,7 @@ def test_without_a_title_the_filename_starts_every_path() -> None:
     assert paths["Fix B."] == ("runbook.md", "2. Fix", "2.1 Restart")
 
 def test_the_same_section_of_two_runbooks_reads_differently() -> None:
-    # rag/14: the escalation misses. Without the title, both chunks were "5. Escalation\n\n| Level | Who |..." and
+    # why escalation questions missed: without the title, both chunks were "5. Escalation\n\n| Level | Who |..." and
     # embedded alike; with it, each names its runbook
     def runbook(source: str, title: str) -> list[Chunk]:
         rows = (("Level", "Who"), ("L2", "on-call"))

@@ -2,7 +2,7 @@ from siteops_agent.chat.base import ChatEngine, ChatRequest, ChatTurn, UpstreamE
 
 
 class FakeChatEngine(ChatEngine):
-    """Returns a fixed turn, or fails like a down service (the fake, design/1). Records the requests it got."""
+    """Returns a fixed turn, or fails like a down service (the fake for tests). Records the requests it got."""
 
     def __init__(self, turn: ChatTurn, error: UpstreamError | None = None) -> None:
         self.turn = turn

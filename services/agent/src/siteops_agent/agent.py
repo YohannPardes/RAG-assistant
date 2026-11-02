@@ -1,4 +1,4 @@
-"""The triage agent (agent/4): one window at a time, the model and its tools in a loop until it decides.
+"""The triage agent: one window at a time, the model and its tools in a loop until it decides.
 
     diagnose ── tool call ──────────────► tools ── decided ──► END  (ticketed / deduplicated / dismissed)
        ▲                                   │
@@ -59,7 +59,7 @@ class TriageAgent:
         """What every window of a run shares: the model, the clients, the budgets. Each window gets its own TriageTools."""
         if max_llm_calls < 1:
             raise ValueError("a window needs at least one model call")
-        self.model = model  # configured by the container: temperature 0, a seed, thinking off, a timeout (arch/7)
+        self.model = model  # configured by the container: temperature 0, a seed, thinking off, a timeout
         self._rag = rag
         self._sink = sink
         self.limits = limits  # tool budgets per window: searches, log_context calls, hits per search

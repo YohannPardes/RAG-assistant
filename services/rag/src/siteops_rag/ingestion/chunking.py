@@ -28,7 +28,7 @@ class Chunker:
         """Chunk the document into smaller pieces, each with a heading path and page number.
         Phase 1 splits each element into pieces that fit; phase 2 packs the pieces of one section together.
 
-        Every heading path starts with the document's identity, its title or else its filename (rag/14):
+        Every heading path starts with the document's identity, its title or else its filename:
         without it, "5. Escalation" of one runbook reads (and embeds) like "5. Escalation" of any other.
         """
 

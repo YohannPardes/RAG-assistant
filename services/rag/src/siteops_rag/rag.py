@@ -1,4 +1,4 @@
-"""Retrieve, then answer from the retrieved chunks with citations, or "I don't know". No reranker yet (rag/8)."""
+"""Retrieve, then answer from the retrieved chunks with citations, or "I don't know". No reranker yet."""
 
 import time
 from typing import Any
@@ -45,7 +45,7 @@ class RAG:
         if scored:  # nothing retrieved: no need to ask the LLM
             reply = self.chat_model.complete_json(SYSTEM_PROMPT, self._user_prompt(question, scored))
             citations = self._checked_citations(reply, scored)
-            # rag/9: an answer counts only if at least one citation checks out (rag/10)
+            # an answer counts only if at least one citation checks out
             if citations:
                 answer = str(reply.get("answer", ""))
 
@@ -66,7 +66,7 @@ class RAG:
 
     @staticmethod
     def _checked_citations(reply: dict[str, Any], scored: list[ScoredChunk]) -> list[Citation]:
-        """Keep the citations that point to a retrieved excerpt and quote it word for word (rag/10)."""
+        """Keep the citations that point to a retrieved excerpt and quote it word for word."""
         items = reply.get("citations")
         if not isinstance(items, list):
             return []

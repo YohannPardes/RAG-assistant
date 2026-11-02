@@ -10,11 +10,11 @@ class LogBatch:
     """What one read gives: the events, and how many records could not be turned into one."""
 
     events: tuple[LogEvent, ...]
-    unparsable: int = 0  # goes in the triage report: a jump in it is itself a signal (agent/9)
+    unparsable: int = 0  # goes in the triage report: a jump in it is itself a signal
 
 
 class LogSource(ABC):
-    """Where the logs come from (agent/13): a file today; a database, an HTTP endpoint or a stream later.
+    """Where the logs come from: a file today; a database, an HTTP endpoint or a stream later.
 
     Every source gives LogEvents, so nothing downstream knows where they came from.
     A text source parses its lines with a LogParser; a structured one (database rows) builds the events itself.
@@ -26,7 +26,7 @@ class LogSource(ABC):
         """The events with since <= time < until, in time order (ties keep the source's order).
 
         A closed range, not "until now": the same range read twice gives the same events, which is what makes
-        a triage run repeatable (agent/4).
+        a triage run repeatable.
         """
         if since.tzinfo is None or until.tzinfo is None:
             raise ValueError("since and until must be timezone-aware: event times are UTC")

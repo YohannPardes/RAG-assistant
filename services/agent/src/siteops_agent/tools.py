@@ -1,4 +1,4 @@
-"""One window's tools as the model sees them: LangChain tools over TriageTools (agent/4). Plumbing and descriptions only.
+"""One window's tools as the model sees them: LangChain tools over TriageTools. Plumbing and descriptions only.
 
 What the model reads is here: each tool's name, its description (prompt text) and its argument schema. What happens
 is in triage_tools.py. A tool's schema is given to LangChain as JSON, so LangChain doesn't validate the arguments
@@ -52,12 +52,12 @@ def search_runbooks(tools: TriageTools) -> BaseTool:
 
 
 def log_context(tools: TriageTools) -> BaseTool:
-    """More log lines around the window, from any host (agent/14)."""
+    """More log lines around the window, from any host."""
     return _tool("log_context", LOG_CONTEXT, LogQuery, tools.log_context)
 
 
 def create_ticket(tools: TriageTools) -> BaseTool:
-    """Open a ticket from the model's judgement; the code checks it and fills the facts (agent/10)."""
+    """Open a ticket from the model's judgement; the code checks it and fills the facts."""
     return _tool("create_ticket", CREATE_TICKET, TicketDraft, tools.create_ticket)
 
 

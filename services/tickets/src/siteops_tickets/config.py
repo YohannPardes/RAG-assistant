@@ -1,10 +1,10 @@
-"""Configuration of the tickets service. Two sources, which never hold the same key (design/4):
+"""Configuration of the tickets service. Two sources, which never hold the same key:
 
   - YAML file         services/tickets/config.yaml (committed; another file with TICKETS_CONFIG_FILE,
                       e.g. config.docker.yaml in the image): every setting but the API key
   - env vars, .env    TICKETS_API_KEY only (.env: services/tickets/.env, never committed; env vars win)
 
-  TICKETS_API_KEY  required: clients send it as `Authorization: Bearer <key>` (agent/5)
+  TICKETS_API_KEY  required: clients send it as `Authorization: Bearer <key>`
 
 The API key in the YAML, another setting in env vars or .env, or a setting missing from the YAML is an error.
 """

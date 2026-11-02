@@ -22,7 +22,7 @@ class InMemoryVectorStore(VectorStore):
         self._delete_stale(chunks)
 
     def _delete_stale(self, chunks: list[Chunk]) -> None:
-        """Delete the chunks of the given chunks' sources that are not among them (rag/12)."""
+        """Delete the chunks of the given chunks' sources that are not among them."""
         sources = {chunk.source for chunk in chunks}
         keep = {chunk.chunk_id for chunk in chunks}
         stale = [cid for cid, (chunk, _) in self._points.items() if chunk.source in sources and cid not in keep]

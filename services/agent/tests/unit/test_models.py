@@ -41,7 +41,7 @@ def test_changing_the_callers_dict_does_not_change_the_event() -> None:
 
 
 def test_a_window_id_depends_on_host_rule_and_span_only() -> None:
-    # stable across runs: the prefilter is pure, so rereading a range gives the same ids (agent/4)
+    # stable across runs: the prefilter is pure, so rereading a range gives the same ids
     window = Window("api-gw-02", "high_latency", TIME, TIME + timedelta(minutes=5), events=(event(),))
 
     assert window.id == Window("api-gw-02", "high_latency", TIME, TIME + timedelta(minutes=5), events=()).id

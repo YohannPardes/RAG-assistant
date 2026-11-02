@@ -31,7 +31,7 @@ def test_real_configs_load_with_the_key_from_the_environment(monkeypatch, name) 
     settings = Settings(_env_file=None)  # type: ignore[call-arg]
 
     assert settings.api_key.get_secret_value() == API_KEY
-    assert settings.dedup_minutes == 60  # agent/3
+    assert settings.dedup_minutes == 60
 
 
 def test_the_key_comes_from_dotenv_too(tmp_path) -> None:

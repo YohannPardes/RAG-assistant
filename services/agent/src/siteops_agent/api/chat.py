@@ -12,7 +12,7 @@ from siteops_common.contracts import FaultType, Severity
 
 class PendingTicket(BaseModel):
     """A drafted ticket for the user to confirm with POST /tickets {draft_token}. The token holds the ticket the
-    code built, signed: the fields here are for display, the token is what gets filed (agent/15)."""
+    code built, signed: the fields here are for display, the token is what gets filed."""
 
     model_config = ConfigDict(frozen=True)
 

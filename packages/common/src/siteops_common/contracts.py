@@ -1,4 +1,4 @@
-"""Wire contracts shared between services (arch/4). Pydantic models, plus pure helpers that define a shared identity."""
+"""Wire contracts shared between services. Pydantic models, plus pure helpers that define a shared identity."""
 
 from typing import Annotated, Literal, Self
 
@@ -18,7 +18,7 @@ class SearchRequest(_Contract):
     """A query to retrieve runbook chunks for."""
 
     query: str = Field(min_length=1)
-    top_k: int | None = Field(default=None, ge=1, le=50)  # None: the rag service's configured default (rag/7)
+    top_k: int | None = Field(default=None, ge=1, le=50)  # None: the rag service's configured default
 
 
 class SearchHit(_Contract):
@@ -29,7 +29,7 @@ class SearchHit(_Contract):
     heading_path: list[str]
     page: int | None
     text: str
-    score: float  # cosine similarity: higher = more similar (rag/13)
+    score: float  # cosine similarity: higher = more similar
 
 
 class SearchResponse(_Contract):
@@ -51,7 +51,7 @@ class AskRequest(_Contract):
 
 
 class Citation(_Contract):
-    """Where a part of the answer comes from (rag/10)."""
+    """Where a part of the answer comes from."""
 
     chunk_id: str  # lets a caller check the citation was really retrieved
     source: str
@@ -61,21 +61,21 @@ class Citation(_Contract):
 
 
 class AskResponse(_Contract):
-    """The answer with its citations, or "I don't know" (rag/9)."""
+    """The answer with its citations, or "I don't know"."""
 
     answered: bool  # False = "I don't know": callers check this, not the answer text
     answer: str
     citations: list[Citation]
     hits: list[SearchHit]  # the context the LLM saw: tells "not retrieved" apart from "retrieved but ignored"
-    model: str  # the LLM that answered (rag/4)
+    model: str  # the LLM that answered
     embedding_model: str
     latency_ms: float  # time spent serving the request, retrieval and generation included
 
 
-# tickets: MCP tool create_ticket (arch/6)
+# tickets: MCP tool create_ticket
 
-# What the agent may diagnose: the seeded faults (scope/2) and "other" for a real problem none of them fits.
-# One list for the agent's prompt, the tickets service and the eval's matching rule (scope/4).
+# What the agent may diagnose: the seeded faults and "other" for a real problem none of them fits.
+# One list for the agent's prompt, the tickets service and the eval's matching rule.
 FaultType = Literal[
     "disk_full",
     "pg_primary_down",
@@ -103,7 +103,7 @@ class RunbookRef(_Contract):
 class TicketCreate(_Contract):
     """An incident the agent asks to open.
 
-    Every text field is bounded: the agent writes them from untrusted logs (agent/1), so a prompt-injected
+    Every text field is bounded: the agent writes them from untrusted logs, so a prompt-injected
     agent can't fill the store or a reader's screen.
     """
 
@@ -126,8 +126,8 @@ class TicketCreate(_Contract):
 
 
 def fingerprint(fault_type: FaultType, host: str) -> str:
-    """ "The same fault" (agent/3): its type on its host. Case and spaces around the host don't matter.
-    One definition for the tickets store and the agent's in-memory sink (arch/4), so their dedup can't differ."""
+    """ "The same fault": its type on its host. Case and spaces around the host don't matter.
+    One definition for the tickets store and the agent's in-memory sink, so their dedup can't differ."""
     return f"{fault_type}|{host.strip().lower()}"
 
 
@@ -136,11 +136,11 @@ class Ticket(TicketCreate):
 
     id: str = Field(min_length=1)
     created_at: AwareDatetime
-    fingerprint: str = Field(min_length=1)  # "the same fault": tickets with one fingerprint are deduplicated (agent/3)
+    fingerprint: str = Field(min_length=1)  # "the same fault": tickets with one fingerprint are deduplicated
 
 
 class CreateTicketResult(_Contract):
     """The reply to create_ticket: the stored ticket, new or the one it duplicates."""
 
     ticket: Ticket
-    created: bool  # False = deduplicated: a ticket with this fingerprint is still within the dedup window (agent/3)
+    created: bool  # False = deduplicated: a ticket with this fingerprint is still within the dedup window

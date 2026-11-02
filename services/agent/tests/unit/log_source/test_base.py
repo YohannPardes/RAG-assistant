@@ -1,4 +1,4 @@
-"""Contract tests: one suite written against `LogSource`, run once per implementation (tooling/5)."""
+"""Contract tests: one suite written against `LogSource`, run once per implementation."""
 
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta, timezone
@@ -50,7 +50,7 @@ def test_events_come_in_time_order_and_ties_keep_the_source_order(make_source) -
 
 
 def test_the_same_range_read_twice_gives_the_same_batch(make_source) -> None:
-    # what makes a triage run repeatable (agent/4)
+    # what makes a triage run repeatable
     source = make_source([line(i, f"m{i}") for i in range(5)])
 
     assert source.read(T0, T0 + timedelta(seconds=3)) == source.read(T0, T0 + timedelta(seconds=3))

@@ -1,4 +1,4 @@
-"""Eval over the golden set (scope/4): retrieval (recall@k, MRR) and, with --ask, answers. Printed as JSON.
+"""Eval over the golden set: retrieval (recall@k, MRR) and, with --ask, answers. Printed as JSON.
 
 Retrieval: does /search put a chunk of the expected source and section in the top k? Overall and per question
 category, so "0.98 on lookups, 0.75 on tables" shows where it fails, not one average.
@@ -55,7 +55,7 @@ def section(hit: ScoredChunk) -> str:
 
 
 def first_hit_rank(row: Row, hits: list[ScoredChunk]) -> int | None:
-    """1-based rank of the first chunk from the expected source and section; never matched by chunk_id (scope/4)."""
+    """1-based rank of the first chunk from the expected source and section; never matched by chunk_id."""
     for rank, hit in enumerate(hits, start=1):
         if hit.chunk.source == row["expected_source"] and section(hit) == row["expected_section"]:
             return rank
@@ -190,7 +190,7 @@ def append_history(path: Path, report: dict[str, Any]) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--ask", action="store_true", help="also score /ask's answers (one LLM call per question)")
-    parser.add_argument("--top-k", type=int, help="default: retrieval.top_k from the rag config, as /search uses (rag/7)")
+    parser.add_argument("--top-k", type=int, help="default: retrieval.top_k from the rag config, as /search uses")
     parser.add_argument("--golden-set", type=Path, default=REPO_ROOT / "data" / "golden_set.jsonl")
     parser.add_argument("--history", type=Path, default=HISTORY)
     parser.add_argument("--no-history", action="store_true", help="print the report without recording the run")
@@ -215,7 +215,7 @@ def main() -> None:
             "vector_store": settings.vector_store.backend,
             "collection": settings.vector_store.collection,
             "top_k": top_k,
-            "reranker": "none",  # no reranker stage yet (rag/8): read it from the settings once there is one
+            "reranker": "none",  # no reranker stage yet: read it from the settings once there is one
             "llm_model": settings.llm.model if args.ask else None,
             "golden_set": args.golden_set.name,
             "golden_set_sha256": file_hash(args.golden_set),

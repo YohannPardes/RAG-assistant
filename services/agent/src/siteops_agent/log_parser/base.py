@@ -12,7 +12,7 @@ _FIELD = re.compile(r"(?<!\S)([A-Za-z_][\w.]*)=([^\s=]\S*)")
 
 
 class LogParser(ABC):
-    """Text line -> LogEvent (agent/9).
+    """Text line -> LogEvent.
 
     Subclasses implement only `_parse_line` (one line format).
     Everything every parser must guarantee lives here, once: bad input never raises,

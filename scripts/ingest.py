@@ -1,4 +1,4 @@
-"""Ingest every runbook of a folder into the vector store (arch/5: a job, not an endpoint).
+"""Ingest every runbook of a folder into the vector store: a job run once, not an endpoint.
 
 Usage: uv run python scripts/ingest.py [folder]   (default: data/runbooks)
 """

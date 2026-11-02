@@ -52,7 +52,7 @@ def test_a_search_posts_the_request_and_returns_the_reply() -> None:
 
 
 def test_no_top_k_is_sent_as_null_so_rag_uses_its_default() -> None:
-    # rag/7: the default lives in rag's config only
+    # the default top_k lives in rag's config only
     rag, seen = client(ok)
 
     rag.search(SearchRequest(query="disk full"))

@@ -1,4 +1,4 @@
-"""The chat engine's contract (agent/15): one turn in, one checked turn out. The engine itself (agent/11) is not here.
+"""The chat engine's contract: one turn in, one checked turn out. The engine itself is not here.
 
 The models enforce what the frontend relies on, so an engine bug fails here instead of on the user's screen:
 every `[n]` marker of the answer is a citation, quote offsets lie inside their chunk, and a ticket proposal only
@@ -29,7 +29,7 @@ class ChatMessage(_Model):
 
 
 class ChatRequest(_Model):
-    """One turn: the whole history (stateless, agent/8), the log range in view, and whether to draft a ticket."""
+    """One turn: the whole history (the agent keeps no conversation state), the log range in view, and whether to draft a ticket."""
 
     messages: list[ChatMessage] = Field(min_length=1, max_length=MAX_MESSAGES)
     since: AwareDatetime
@@ -107,8 +107,8 @@ class Warning(_Model):  # noqa: A001  # the frontend's name for a degraded turn
 
 
 class TicketProposal(_Model):
-    """A ticket the engine drafted (draft_ticket turns only): built by code from checked judgement, as in triage
-    (agent/10). `evidence` and `runbook` are citation numbers of the same turn, so the card reuses its sources."""
+    """A ticket the engine drafted (draft_ticket turns only): built by code from checked judgement, as in triage.
+    `evidence` and `runbook` are citation numbers of the same turn, so the card reuses its sources."""
 
     ticket: TicketCreate
     evidence: list[int] = Field(min_length=1)
@@ -153,7 +153,7 @@ class UpstreamError(Exception):
 
 
 class ChatEngine(ABC):
-    """Answers one chat turn with read-only tools (agent/11); never files a ticket itself."""
+    """Answers one chat turn with read-only tools; never files a ticket itself."""
 
     @abstractmethod
     def reply(self, request: ChatRequest) -> ChatTurn:

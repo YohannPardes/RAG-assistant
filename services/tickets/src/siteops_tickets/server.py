@@ -1,6 +1,6 @@
 """MCP entry point of the tickets service: transport and wiring only. The tools themselves are in tools.py.
 
-Streamable HTTP (arch/6) at /mcp, behind an API key (agent/5).
+Streamable HTTP at /mcp, behind an API key.
 Run: TICKETS_API_KEY=... uv run python -m siteops_tickets.server
 """
 

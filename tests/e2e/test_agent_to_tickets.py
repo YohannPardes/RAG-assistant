@@ -1,4 +1,4 @@
-"""The agent's MCP ticket sink against the real tickets service: the wire contract, the key, the dedup (agent/3)."""
+"""The agent's MCP ticket sink against the real tickets service: the wire contract, the key, the dedup."""
 
 from datetime import UTC, datetime
 
@@ -27,7 +27,7 @@ def test_a_ticket_is_filed_then_deduplicated_by_the_service(tickets_url) -> None
     sink = McpTicketSink(tickets_url, API_KEY, timeout=10.0, retries=2)
 
     first = sink.create(TICKET)
-    again = sink.create(TICKET.model_copy(update={"host": "DB-PRIMARY-01"}))  # same fingerprint (common's, arch/4)
+    again = sink.create(TICKET.model_copy(update={"host": "DB-PRIMARY-01"}))  # same fingerprint: the host is normalised
 
     assert first.created and first.ticket.fingerprint == "pg_primary_down|db-primary-01"
     assert not again.created and again.ticket.id == first.ticket.id
