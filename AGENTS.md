@@ -76,13 +76,9 @@ rag_project/
 │   │   ├── api/                ENTRY   one router per area, assembled in app.py (agent/15)
 │   │   │   ├── app.py          ApiParts, build_app: the routers, the key check, the error shape
 │   │   │   ├── auth.py  errors.py     API key (agent/5); {"detail", "code"} for every error
-│   │   │   ├── chat.py         POST /chat: one stateless turn; signs drafted tickets
-│   │   │   ├── tickets.py      POST /tickets: confirm a signed draft
 │   │   │   ├── triage.py       POST /triage (202 queued, 503 when full), GET /triage[/{run_id}]
 │   │   │   ├── windows.py      GET /windows: the prefilter's windows, counts only
-│   │   │   └── meta.py  health.py     GET /meta, GET /health
-│   │   ├── chat/         base.py  fake.py                  INTERFACE + ADAPTERS  ChatEngine and its turn contract (the real engine comes with the graph)
-│   │   ├── drafts.py           CORE    DraftSigner: HMAC-signed ticket drafts for POST /tickets
+│   │   │   └── health.py       GET /health
 │   │   ├── runs.py             CORE    TriageRuns: a queue of 5, one worker running them in order, the last 50 kept in memory
 │   │   ├── cli.py              ENTRY   one run for a scheduler, the eval or by hand: --since --until [--dry-run] [--report] [--log]
 │   │   ├── container.py        ROOT    build_job: the triage job (model, rag, tickets or a dry-run sink, log file), for the CLI and the API
@@ -107,10 +103,9 @@ rag_project/
 │           ├── conftest.py              generate_logs (the generator script, loaded from its path), a window and its search hits
 │           ├── test_generated_logs.py   scripts/generate_logs.py: determinism, fault windows, decoys, ground truth, every line parses
 │           ├── test_models.py           LogEvent / Window: frozen and hashable, Window.id
-│           ├── test_prompts.py  test_decision.py  test_report.py  test_config.py  test_log_context.py  test_triage_tools.py  test_runs.py  test_drafts.py
+│           ├── test_prompts.py  test_decision.py  test_report.py  test_config.py  test_log_context.py  test_triage_tools.py  test_runs.py
 │           ├── test_agent.py            the routers' table; whole windows with a scripted model (decisions, retry, reminder, budget, errors); the logged transcript
-│           ├── api/                 conftest.py (the API on fakes)  test_app.py  test_chat.py  test_tickets.py  test_triage.py  test_windows.py  test_meta.py
-│           ├── chat/test_base.py    the turn contract: markers, offsets, proposals
+│           ├── api/                 conftest.py (the API on fakes)  test_app.py  test_triage.py  test_windows.py
 │           ├── test_prefilter.py        matching, merging, thresholds, context, cap, order; agent/12's recall on generated logs
 │           ├── log_parser/test_syslog.py
 │           ├── log_source/          test_base.py (contract suite: memory + file)  test_file.py

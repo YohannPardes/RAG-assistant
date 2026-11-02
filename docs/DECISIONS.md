@@ -550,6 +550,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - **One error shape** for every route (`errors.py`): `{"detail", "code"}`, `code` stable for the frontend to branch on (`invalid_request` 422, `unauthorized` 401, `invalid_draft` 422, `queue_full` / `tickets_disabled` 503, `upstream_failed` 502, `upstream_timeout` 504, `run_not_found` 404).
 - **Not built:** `GET /runbooks/section` (it needs rag to return a chunk's neighbours, which the tool probe showed adds nothing for triage), streaming steps over SSE, per-user auth (agent/2).
 - **Cost:** the draft secret must be shared by every API process, or a draft signed by one fails on another; the API runs as one process (agent/8). A draft expires after 30 minutes and must be written again.
+- **Amended (2026-11-02), chat removed for now:** the agent's API serves `/health`, `/triage` and `/windows` only. `/chat`, `/tickets`, `/meta`, the turn contract (`chat/`) and the signed drafts (`drafts.py`) are removed until a chat engine is built (agent/11 stays Proposed); they are in git history (commit `6503461`). The service is built by `container.build_api` and started by `api/main.py`.
 
 ---
 
