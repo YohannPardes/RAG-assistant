@@ -22,7 +22,7 @@ from siteops_agent.triage_tools import RunbookQuery, ToolReply, TriageTools
 SEARCH_RUNBOOKS = (
     "Search the runbooks for passages whose symptoms match what the window shows. Returns a few passages, each with "
     "its chunk_id (what you cite as runbook_chunk_id), its source and its section. Search for what the logs show, "
-    "in a few words; a later search can refine it."
+    "in a few words; a later search with different terms can help you gather better information."
 )
 LOG_CONTEXT = (
     "More log lines around the window, from any host, filtered by host, component, minimum level and a regular "

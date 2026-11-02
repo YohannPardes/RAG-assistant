@@ -24,7 +24,7 @@ class TicketDraft(_Decision):
     """A ticket as the model writes it: judgement only. Bounds match TicketCreate's."""
 
     fault_type: FaultType = Field(description='The diagnosed fault; "other" for a real fault none of the types fits.')
-    host: str = Field(min_length=1, max_length=255, description="The root-cause host. It must appear in the lines shown.")
+    host: str = Field(min_length=1, max_length=255, description="The root-cause server: a host that wrote lines in these logs.")
     severity: Severity
     title: str = Field(min_length=1, max_length=200)
     summary: str = Field(min_length=1, max_length=4000, description="What happened, its impact, and why this diagnosis.")

@@ -22,7 +22,7 @@ from siteops_agent.log_context import LogContext, LogContextError, LogQuery
 from siteops_agent.models import Window
 from siteops_agent.prompts import ShownLines, render_context
 from siteops_agent.rag_client.base import RagClient, RagError
-from siteops_agent.report import Search
+from siteops_agent.report import LogLookup, Search
 from siteops_agent.ticket_sink.base import TicketSink, TicketSinkError
 from siteops_common.contracts import CreateTicketResult, SearchHit, SearchRequest
 
@@ -79,15 +79,6 @@ class Dismissed:
 
 
 Decision = Ticketed | Dismissed
-
-
-@dataclass(frozen=True)
-class LogLookup:
-    """One log_context call, for the report and the traces."""
-
-    query: dict[str, Any]
-    events: int
-    omitted: int
 
 
 class TriageTools:

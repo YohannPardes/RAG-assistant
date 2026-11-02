@@ -33,6 +33,14 @@ class Search(_Report):
     sources: list[str]  # the runbooks of those chunks, best first: whether the right one was even offered
 
 
+class LogLookup(_Report):
+    """One log_context call: what the model asked (only the fields it set), how many lines came back."""
+
+    query: dict[str, Any]
+    events: int
+    omitted: int
+
+
 class WindowOutcome(_Report):
     """How one window ended, and enough of how it got there to debug it."""
 
@@ -48,6 +56,7 @@ class WindowOutcome(_Report):
     ticket_id: str | None = None
     dismissal: Dismissal | None = None
     searches: list[Search] = Field(default_factory=list)
+    log_lookups: list[LogLookup] = Field(default_factory=list)
     check_errors: list[str] = Field(default_factory=list)  # rejected create_ticket calls, in order
     llm_calls: int = 0
     duration_s: float = 0.0
