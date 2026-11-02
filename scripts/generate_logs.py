@@ -145,7 +145,7 @@ def pg_primary_down(rng: random.Random, start: datetime, end: datetime) -> list[
     ]
     paused = "leader db-primary-01 unreachable; no automatic failover, cluster paused"
     lines += [(t, "WARN", "db-replica-02", "patroni", paused) for t in ticks(rng, start, end, 120)]
-    message ="POST /v2/orders 500 orders-db write failed: FATAL: the database system is in recovery mode"
+    message = "POST /v2/orders 500 orders-db write failed: FATAL: the database system is in recovery mode"
     lines += [(t, "ERROR", rng.choice(["api-01", "api-02", "api-03"]), "public-api", message) for t in ticks(rng, start, end, 10)]
     return lines
 
@@ -282,15 +282,17 @@ def generate(seed: int, start: datetime, hours: float) -> tuple[list[Line], list
     faults: list[dict[str, str | list[str]]] = []
     for number, (fault, fault_start, fault_end) in enumerate(windows, start=1):
         lines += fault.emit(rng, fault_start, fault_end)
-        faults.append({
-            "id": f"F{number}",
-            "fault_type": fault.fault_type,
-            "host": fault.host,
-            "affected_hosts": list(fault.affected_hosts),
-            "start": iso(fault_start),
-            "end": iso(fault_end),
-            "expected_runbook": fault.expected_runbook,
-        })
+        faults.append(
+            {
+                "id": f"F{number}",
+                "fault_type": fault.fault_type,
+                "host": fault.host,
+                "affected_hosts": list(fault.affected_hosts),
+                "start": iso(fault_start),
+                "end": iso(fault_end),
+                "expected_runbook": fault.expected_runbook,
+            }
+        )
     for i in range(int(hours * 2)):  # about two decoys an hour, each kind in turn
         lines += DECOYS[i % len(DECOYS)](decoy_time(rng, start, end, windows))
     return sorted(lines, key=lambda line: line[0]), faults

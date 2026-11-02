@@ -56,9 +56,7 @@ def test_edited_document_replaces_its_old_chunks(pipeline, store, embedder) -> N
     pipeline.run(txt("runbook_high_latency.txt", "The p99 latency alert fires above 800 ms.\n\nScale the api deployment up."))
 
     # re-ingesting replaces the document: the removed step no longer comes back in search results
-    assert stored(store, embedder) == {
-        "runbook_high_latency.txt": ["Scale the api deployment up.", "The p99 latency alert fires above 800 ms."]
-    }
+    assert stored(store, embedder) == {"runbook_high_latency.txt": ["Scale the api deployment up.", "The p99 latency alert fires above 800 ms."]}
 
 
 def test_other_documents_are_not_touched(pipeline, store, embedder) -> None:

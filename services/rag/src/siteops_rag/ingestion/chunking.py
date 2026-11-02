@@ -8,7 +8,7 @@ from siteops_rag.models import Chunk, Document, Element, render_table
 logger = logging.getLogger(__name__)
 
 
-CHUNK_NAMESPACE = uuid.UUID("89c30320-bb66-4158-906c-fbd729a1df0b")   # any fixed UUID: generate one once with uuid.uuid4() and paste it in
+CHUNK_NAMESPACE = uuid.UUID("89c30320-bb66-4158-906c-fbd729a1df0b")  # any fixed UUID: generate one once with uuid.uuid4() and paste it in
 
 # Split points from coarsest to finest: paragraph, line, sentence, word. Then a hard cut.
 SEPARATORS = ("\n\n", "\n", ". ", " ")
@@ -18,13 +18,12 @@ CODE_SEPARATORS = ("\\\n", " && ", " || ", " | ", "; ", " ")
 
 
 class Chunker:
-
-    def __init__(self, max_length : int, length_func : Callable[[str], int] = len) -> None:
+    def __init__(self, max_length: int, length_func: Callable[[str], int] = len) -> None:
 
         self.max_length = max_length
         self.length_func = length_func
 
-    def chunk_elements(self, doc : Document) -> list[Chunk]:
+    def chunk_elements(self, doc: Document) -> list[Chunk]:
         """Chunk the document into smaller pieces, each with a heading path and page number.
         Phase 1 splits each element into pieces that fit; phase 2 packs the pieces of one section together.
 
@@ -33,9 +32,9 @@ class Chunker:
         """
 
         title_index, title = self._title(doc)
-        chunks : list[Chunk] = []
-        headings : list[tuple[int, str]] = []  # (level, text) of the open headings under the title, outermost first
-        section : list[tuple[str, int | None]] = []  # (text, page) pieces of the current section
+        chunks: list[Chunk] = []
+        headings: list[tuple[int, str]] = []  # (level, text) of the open headings under the title, outermost first
+        section: list[tuple[str, int | None]] = []  # (text, page) pieces of the current section
         for index, element in enumerate(doc.elements):
             heading_path = (title, *(text for _, text in headings))
 
@@ -64,7 +63,7 @@ class Chunker:
         return chunks
 
     @staticmethod
-    def _title(doc : Document) -> tuple[int | None, str]:
+    def _title(doc: Document) -> tuple[int | None, str]:
         """(position, text) of the document's title: its first level-0 heading, else (None, its filename)."""
         for index, element in enumerate(doc.elements):
             if element.kind == "heading" and element.level == 0 and element.text.strip():
@@ -72,23 +71,22 @@ class Chunker:
         return None, doc.source
 
     @staticmethod
-    def _prefix(heading_path : tuple[str, ...]) -> str:
+    def _prefix(heading_path: tuple[str, ...]) -> str:
         """Every chunk starts with its heading path, so it reads (and embeds) on its own."""
         return f"{' > '.join(heading_path)}\n\n" if heading_path else ""
 
-    def _pack_section(self, source : str, heading_path : tuple[str, ...],
-                      pieces : list[tuple[str, int | None]]) -> list[Chunk]:
+    def _pack_section(self, source: str, heading_path: tuple[str, ...], pieces: list[tuple[str, int | None]]) -> list[Chunk]:
         """Phase 2: pack consecutive pieces of one section into chunks, as many as fit.
         The prefix counts toward the limit; a chunk's page is the page of its first piece.
         """
         prefix = self._prefix(heading_path)
         limit = self.max_length - self.length_func(prefix)
 
-        def fits(group : list[tuple[str, int | None]]) -> bool:
+        def fits(group: list[tuple[str, int | None]]) -> bool:
             return self.length_func("\n\n".join(text for text, _ in group)) <= limit
 
         groups = []
-        current : list[tuple[str, int | None]] = []
+        current: list[tuple[str, int | None]] = []
         for piece in pieces:
             # the piece fits with the current ones (or starts an empty chunk): add it
             if not current or fits([*current, piece]):
@@ -108,16 +106,18 @@ class Chunker:
         chunks = []
         for group in groups:
             text = prefix + "\n\n".join(text for text, _ in group)
-            chunks.append(Chunk(
-                chunk_id = str(uuid.uuid5(CHUNK_NAMESPACE, f"{source}|{' > '.join(heading_path)}|{text}")),
-                source = source,
-                text = text,
-                heading_path = heading_path,
-                page = group[0][1]
-            ))
+            chunks.append(
+                Chunk(
+                    chunk_id=str(uuid.uuid5(CHUNK_NAMESPACE, f"{source}|{' > '.join(heading_path)}|{text}")),
+                    source=source,
+                    text=text,
+                    heading_path=heading_path,
+                    page=group[0][1],
+                )
+            )
         return chunks
 
-    def _chunk_element(self, elem : Element, limit : int) -> list[str]:
+    def _chunk_element(self, elem: Element, limit: int) -> list[str]:
         """This function chunks the text of an element into smaller pieces if it exceeds the limit
         It never cuts a phrase in the middle, a table mid row, or a code block in the middle.
         As much as possible.
@@ -133,13 +133,13 @@ class Chunker:
         if elem.kind in ["paragraph", "caption", "heading"]:
             return self._chunk_regular_text(elem.text, limit=limit)
 
-        if elem.kind ==  "table":
+        if elem.kind == "table":
             return self._chunk_table(elem, limit)
 
         # fallback: chunk it as regular text
         return self._chunk_regular_text(elem.text, limit=limit)
-        
-    def _chunk_table(self, table : Element, limit : int) -> list[str]:
+
+    def _chunk_table(self, table: Element, limit: int) -> list[str]:
         """Chunk a table by rows, repeating the header in every chunk so each one reads on its own."""
 
         # no structured rows (e.g. a table from plain text): treat it as regular text
@@ -182,7 +182,7 @@ class Chunker:
             chunks.append(render_table((header, *current_rows)))
         return chunks
 
-    def _chunk_row_cells(self, header : tuple[str, ...], row : tuple[str, ...], limit : int) -> list[str]:
+    def _chunk_row_cells(self, header: tuple[str, ...], row: tuple[str, ...], limit: int) -> list[str]:
         """Chunk one row that is too big for table form: one "column : value" line per cell,
         packing as many whole cells as fit into each chunk.
         """
@@ -227,7 +227,7 @@ class Chunker:
         first = chunks[:1] if chunks and chunks[0] != key else []
         return first + [f"{key}\n{chunk}" for chunk in chunks[1:]]
 
-    def _chunk_code(self, code : Element, limit : int) -> list[str]:
+    def _chunk_code(self, code: Element, limit: int) -> list[str]:
         """Chunk a code block between lines only (blank lines first, then line breaks), never inside a line.
         Every chunk is fenced, so the LLM knows it is code and reproduces it verbatim.
         """
@@ -240,7 +240,7 @@ class Chunker:
         if not lines:
             return []  # empty or whitespace-only block: nothing to retrieve
 
-        def fence(body : str) -> str:
+        def fence(body: str) -> str:
             return f"```{code.language or ''}\n{body}\n```"
 
         # the fences count toward the limit
@@ -271,7 +271,7 @@ class Chunker:
             chunks.append(fence("\n\n".join(current_blocks)))
         return chunks
 
-    def _chunk_code_lines(self, block : str, budget : int) -> list[str]:
+    def _chunk_code_lines(self, block: str, budget: int) -> list[str]:
         """Pack as many whole commands of a block as fit. A command longer than the budget
         is cut at its operators (&&, |, ; ...), and per word only if nothing else helps.
         """
@@ -304,8 +304,7 @@ class Chunker:
             chunks.append(current)
         return chunks
 
-    def _chunk_regular_text(self, text : str, separators : tuple[str, ...] = SEPARATORS,
-                            limit : int | None = None) -> list[str]:
+    def _chunk_regular_text(self, text: str, separators: tuple[str, ...] = SEPARATORS, limit: int | None = None) -> list[str]:
         """This function chunks a regular text (paragraph, caption, heading) into smaller pieces if it exceeds the max_tokens limit
         It tries to never cut a phrase in the middle.
         """
@@ -314,7 +313,6 @@ class Chunker:
         chunks = []
         current_chunk = ""
         for line in self._split_recursive(text, separators, limit):
-
             if self.length_func(current_chunk + line) > limit:
                 chunks.append(current_chunk)
                 current_chunk = line
@@ -324,8 +322,7 @@ class Chunker:
             chunks.append(current_chunk)
         return chunks
 
-    def _split_recursive(self, text : str, separators : tuple[str, ...] = SEPARATORS,
-                         limit : int | None = None) -> list[str]:
+    def _split_recursive(self, text: str, separators: tuple[str, ...] = SEPARATORS, limit: int | None = None) -> list[str]:
         """Split text until every piece fits in limit (default max_tokens), trying the coarsest separator first.
         Separators are kept at the end of each piece, so "".join(pieces) == text.
         """
@@ -337,7 +334,7 @@ class Chunker:
 
         # no separator left: hard cut every limit characters
         if not separators:
-            return [text[i:i + limit] for i in range(0, len(text), limit)]
+            return [text[i : i + limit] for i in range(0, len(text), limit)]
 
         separator, finer = separators[0], separators[1:]
         parts = text.split(separator)
@@ -355,5 +352,3 @@ class Chunker:
             if part:
                 pieces.extend(self._split_recursive(part, finer, limit))
         return pieces
-
-

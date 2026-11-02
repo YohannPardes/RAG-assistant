@@ -131,8 +131,7 @@ class DoclingDocumentConverter(AbstractDocumentConverter):
     @staticmethod
     def _inside(inner: BoundingBox, outer: BoundingBox, tolerance: float = 1.0) -> bool:
         """Top-left origin boxes: t < b."""
-        return (outer.l - tolerance <= inner.l and inner.r <= outer.r + tolerance
-                and outer.t - tolerance <= inner.t and inner.b <= outer.b + tolerance)
+        return outer.l - tolerance <= inner.l and inner.r <= outer.r + tolerance and outer.t - tolerance <= inner.t and inner.b <= outer.b + tolerance
 
     @staticmethod
     def _steps(lines: list[TextCell]) -> list[str]:

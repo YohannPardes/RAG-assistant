@@ -67,8 +67,16 @@ def test_search_returns_the_ranked_hits(api_client, add_chunks) -> None:
         ("/search", {"query": "x", "top_k": 0}),
         ("/search", {"question": "x"}),  # the /ask field name sent to /search
     ],
-    ids=["ask-missing-question", "ask-empty-question", "ask-top-k-0", "ask-top-k-51", "ask-unknown-field",
-         "search-empty-query", "search-top-k-0", "search-wrong-field"],
+    ids=[
+        "ask-missing-question",
+        "ask-empty-question",
+        "ask-top-k-0",
+        "ask-top-k-51",
+        "ask-unknown-field",
+        "search-empty-query",
+        "search-top-k-0",
+        "search-wrong-field",
+    ],
 )
 def test_invalid_requests_are_rejected_with_422(api_client, path, payload) -> None:
     assert api_client.post(path, json=payload).status_code == 422

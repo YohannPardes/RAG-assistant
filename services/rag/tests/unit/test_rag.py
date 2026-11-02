@@ -92,8 +92,16 @@ def test_quote_may_differ_in_whitespace_only(rag, chat_model, three_runbooks) ->
         {},
     ],
     ids=[
-        "excerpt-0", "excerpt-past-the-end", "excerpt-negative", "excerpt-as-string", "no-quote",
-        "blank-quote", "citation-not-an-object", "citations-not-a-list", "no-citations", "empty-reply",
+        "excerpt-0",
+        "excerpt-past-the-end",
+        "excerpt-negative",
+        "excerpt-as-string",
+        "no-quote",
+        "blank-quote",
+        "citation-not-an-object",
+        "citations-not-a-list",
+        "no-citations",
+        "empty-reply",
     ],
 )
 def test_malformed_reply_gives_i_dont_know_instead_of_failing(rag, chat_model, three_runbooks, reply) -> None:
