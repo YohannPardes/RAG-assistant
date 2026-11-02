@@ -105,3 +105,9 @@ def test_the_makefile_pulls_the_models_the_configs_use() -> None:
     rag, agent = docker_config("rag"), docker_config("agent")
 
     assert {rag["embedding"]["model"], rag["llm"]["model"], agent["llm"]["model"]} <= pulled
+
+
+def test_the_rag_image_has_fonts_for_pdf_conversion() -> None:
+    # the runbooks' PDFs embed no fonts: without system fonts docling draws their pages wrongly and loses headings
+    # (in one PDF, 6 of its 10 sections), which silently breaks the sections retrieval is scored on
+    assert re.search(r"apt-get install .*fonts-liberation", dockerfile("rag"))
