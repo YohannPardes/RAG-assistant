@@ -9,9 +9,9 @@ Only the composition root (container.py) reads Settings; adapters receive plain 
 
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 from pydantic.fields import FieldInfo
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict, YamlConfigSettingsSource
 
@@ -77,6 +77,34 @@ class TicketSinkSettings(_Section):
     retries: int = Field(ge=0)
 
 
+class LlmSettings(_Section):
+    base_url: str  # an OpenAI-compatible API
+    model: str
+    reasoning_effort: Literal["none", "low", "medium", "high"] | None  # "none" turns thinking off (Ollama); null: the server's default
+    temperature: float = Field(ge=0)
+    seed: int  # with temperature 0: the same window gets the same answers
+    timeout: float = Field(gt=0)  # seconds per model call
+    max_retries: int = Field(ge=0)
+
+
+class TriageSettings(_Section):
+    """The budgets of one window."""
+
+    max_llm_calls: int = Field(ge=1)
+    max_searches: int = Field(ge=1)
+    max_log_queries: int = Field(ge=0)
+    hits_per_search: int = Field(ge=1)
+
+
+class LogSettings(_Section):
+    path: Path  # the log file; a relative path is relative to services/agent/
+
+    @field_validator("path")
+    @classmethod
+    def _from_the_service_dir(cls, path: Path) -> Path:
+        return path if path.is_absolute() else (_SERVICE_DIR / path).resolve()
+
+
 class ApiSettings(_Section):
     host: str
     port: int = Field(gt=0, lt=65536)
@@ -95,6 +123,9 @@ class Settings(BaseSettings):
 
     rag: RagClientSettings
     tickets: TicketSinkSettings
+    llm: LlmSettings
+    triage: TriageSettings
+    logs: LogSettings
     api: ApiSettings
 
     @classmethod

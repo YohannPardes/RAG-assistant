@@ -85,7 +85,8 @@ rag_project/
 │   │   ├── drafts.py           CORE    DraftSigner: HMAC-signed ticket drafts for POST /tickets
 │   │   ├── runs.py             CORE    TriageRuns: a queue of 5, one worker running them in order, the last 50 kept in memory
 │   │   ├── cli.py              ENTRY   for a scheduler
-│   │   ├── container.py  config.py   ROOT
+│   │   ├── container.py        ROOT
+│   │   ├── config.py           ROOT    env settings (read only by container)
 │   │   ├── triage.py           CORE    run_triage: [since, until) → events → windows → one TriageWindow call each → TriageReport
 │   │   ├── agent.py            FLOW    TriageAgent: the window's LangGraph graph, diagnose ⇄ tools until create_ticket or dismiss (agent/4); logs each window's full transcript
 │   │   ├── models.py           CORE    LogEvent, Window and its stable id (agent/9)
