@@ -86,7 +86,7 @@ rag_project/
 │   │   ├── runs.py             CORE    TriageRuns: a queue of 5, one worker running them in order, the last 50 kept in memory
 │   │   ├── cli.py              ENTRY   for a scheduler
 │   │   ├── container.py  config.py   ROOT
-│   │   ├── agent.py            FLOW    the window's LangGraph StateGraph: diagnose ⇄ tools until create_ticket or dismiss (agent/4)
+│   │   ├── agent.py            FLOW    TriageAgent: the window's LangGraph graph, diagnose ⇄ tools until create_ticket or dismiss (agent/4); logs each window's full transcript
 │   │   ├── models.py           CORE    LogEvent, Window and its stable id (agent/9)
 │   │   ├── prompts.py          CORE    system prompt, a window and context numbered for the model; ShownLines, the only definition of line numbers
 │   │   ├── log_context.py      CORE    LogQuery, LogContext: more events around a window, from this run's events (agent/14)
@@ -106,6 +106,7 @@ rag_project/
 │           ├── test_generated_logs.py   scripts/generate_logs.py: determinism, fault windows, decoys, ground truth, every line parses
 │           ├── test_models.py           LogEvent / Window: frozen and hashable, Window.id
 │           ├── test_prompts.py  test_decision.py  test_report.py  test_config.py  test_log_context.py  test_triage_tools.py  test_runs.py  test_drafts.py
+│           ├── test_agent.py            the routers' table; whole windows with a scripted model (decisions, retry, reminder, budget, errors); the logged transcript
 │           ├── api/                 conftest.py (the API on fakes)  test_app.py  test_chat.py  test_tickets.py  test_triage.py  test_windows.py  test_meta.py
 │           ├── chat/test_base.py    the turn contract: markers, offsets, proposals
 │           ├── test_prefilter.py        matching, merging, thresholds, context, cap, order; agent/12's recall on generated logs
