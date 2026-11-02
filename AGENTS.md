@@ -78,10 +78,11 @@ rag_project/
 │   │   │   ├── auth.py  errors.py     API key (agent/5); {"detail", "code"} for every error
 │   │   │   ├── triage.py       POST /triage (202 queued, 503 when full), GET /triage[/{run_id}]
 │   │   │   ├── windows.py      GET /windows: the prefilter's windows, counts only
-│   │   │   └── health.py       GET /health
+│   │   │   ├── health.py       GET /health
+│   │   │   └── main.py         starts the service: uv run python -m siteops_agent.api.main
 │   │   ├── runs.py             CORE    TriageRuns: a queue of 5, one worker running them in order, the last 50 kept in memory
 │   │   ├── cli.py              ENTRY   one run for a scheduler, the eval or by hand: --since --until [--dry-run] [--report] [--log]
-│   │   ├── container.py        ROOT    build_job: the triage job (model, rag, tickets or a dry-run sink, log file), for the CLI and the API
+│   │   ├── container.py        ROOT    build_job: the triage job (model, rag, tickets or a dry-run sink, log file); build_api: the service
 │   │   ├── config.py           ROOT    settings: config.yaml (rag, tickets, llm, triage budgets, logs, api), secrets from env / .env
 │   │   ├── triage.py           CORE    run_triage: [since, until) → events → windows → one TriageWindow call each → TriageReport
 │   │   ├── agent.py            FLOW    TriageAgent: the window's LangGraph graph, diagnose ⇄ tools until create_ticket or dismiss (agent/4); logs each window's full transcript
@@ -104,6 +105,7 @@ rag_project/
 │           ├── test_generated_logs.py   scripts/generate_logs.py: determinism, fault windows, decoys, ground truth, every line parses
 │           ├── test_models.py           LogEvent / Window: frozen and hashable, Window.id
 │           ├── test_prompts.py  test_decision.py  test_report.py  test_config.py  test_log_context.py  test_triage_tools.py  test_runs.py
+│           ├── test_container.py        the service built from the real config.yaml: routes behind the key, /windows
 │           ├── test_agent.py            the routers' table; whole windows with a scripted model (decisions, retry, reminder, budget, errors); the logged transcript
 │           ├── api/                 conftest.py (the API on fakes)  test_app.py  test_triage.py  test_windows.py
 │           ├── test_prefilter.py        matching, merging, thresholds, context, cap, order; agent/12's recall on generated logs
