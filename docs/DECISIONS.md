@@ -2,7 +2,7 @@
 
 Lightweight ADRs. One entry per decision: what, why, what it costs.
 
-**Status:** **Decided** (made by me) · **Proposed** (a recommendation waiting for yes/no) · **Open** (undecided topic, no recommendation yet) · **Superseded**.
+**Status:** **Decided** (made by me) · **Proposed** (a recommendation waiting for yes/no) · **Open** (undecided topic, no recommendation yet) · **Deferred** (out of this version, may come back) · **Superseded**. "Decided (…, as built)" records a recommendation the code already follows.
 
 **Priority (Open entries only):** **P1** — decide before writing code · **P2** — decide while building that part · **P3** — cut candidate for the 8-day scope; confirming the cut is itself the decision.
 
@@ -23,8 +23,8 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 
 | Priority                       | Decisions                                                                                                                                                                                                                                                                                              |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **P1 — before code**    | rag/5 embedding model · agent/2 access levels                                                                                                                                                                                              |
-| **P2 — while building** | rag/6 chunking · rag/8 reranker model · rag/9 "I don't know" rule · rag/10 citations · agent/5 auth · scope/4 golden set · scope/5 eval thresholds · arch/8 persistence · tooling/6 CI · arch/12 full compose stack |
+| **P1 — before code**    | agent/2 access levels                                                                                                                                                                                                                  |
+| **P2 — while building** | scope/5 eval thresholds                                                                                                                                                                                                                |
 | **P3 — cut candidates** | rag/11 hybrid search · scope/6 LLM-judge metric · arch/9 distributed tracing · agent/6 scheduled triage · arch/10 backups                                                                                                                                                                          |
 
 ---
@@ -53,10 +53,12 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 **Status:** Decided (2026-10-27)
 
 - **Note:** reranker's value must be shown by an eval number (recall@k / MRR with vs without).
+- **Amended (2026-11-02), reranker cut from this version:** it was never built, and the empty `reranker/` package is removed. rag answers from the `top_k` chunks the vector store returns (rag/7); `scripts/run_eval.py` records `"reranker": "none"` in every run. rag/8 is deferred with it. `api` stays: rag serves `/search` and `/ask`, the agent `/triage` and `/windows`.
+- **Cost:** no number shows what a reranker would add at a smaller `top_k`, where recall@5 is 0.956. Adding one back means a `Reranker` interface with a passthrough fake (design/1) and an eval run with and without it.
 
 ### scope/4 — Golden set: size and construction
 
-**Status:** Proposed · **Priority:** P2
+**Status:** Decided (2026-11-02, as built)
 
 - How many question → expected-chunk pairs, how they're written (by hand from runbooks, or generated then reviewed), and how triage ground truth links to scope/2's seeded faults.
 - **Recommendation (retrieval part, in `data/golden_set.jsonl`):** ~40 questions written by hand, ~10 per runbook, paraphrased rather than copied so they test meaning and not keyword overlap. Each line is `{question, expected_source, expected_section}`. A hit is a chunk with the same `source` whose `heading_path[-1]` equals `expected_section`, never a `chunk_id`, so the labels survive chunking changes (rag/6). Each question has one unambiguous section. `services/rag/tests/integration/test_golden_set.py` checks that every label names a section that ingestion really produces. Triage ground truth is still open.
@@ -71,12 +73,14 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
   - **answer rate** and **citation accuracy** (a citation of the expected source and section) on answerable questions;
   - **key facts**: every `must_contain` string in the answer, case-insensitive.
   A rate with nothing to measure is `null`, not 0. A miss now names the runbook as well as the section it got.
+- **State of the data (2026-11-02):** `data/golden_set.jsonl` has 91 questions, none with a `category` or `must_contain` yet: every question reports as `uncategorized`, and with no `unanswerable` questions the false-answer rate is `null`. `data/logs/ground_truth.json` exists, but no code scores a `TriageReport` against it yet (`tests/eval/` is empty), so the matching rule above is specified, not measured.
 
 ### scope/5 — Eval pass thresholds
 
 **Status:** Open · **Priority:** P2
 
 - Target numbers for recall@5, MRR (with vs without reranker, scope/3), and ticket precision/recall.
+- **Note (2026-11-02):** the reranker comparison is gone with the reranker (scope/3, amended); ticket precision/recall needs the triage eval first (scope/4).
 
 ### scope/6 — LLM-as-judge for answer quality
 
@@ -117,6 +121,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - Docker: each image copies `common` + its own service, `uv sync --package <service>`; build context = repo root.
 - MCP tool schemas are generated from `common` pydantic models (single source of truth for the wire format).
 - **Amended (2026-11-01):** contracts may include **pure helpers that define a shared identity**, so two services can't disagree on it. First case: `fingerprint(fault_type, host)` (agent/3), used by the tickets store and the agent's in-memory ticket sink.
+- **Names as built (2026-11-02):** the layout above used early names. The packages are `packages/common/src/siteops_common/`, `services/rag/src/siteops_rag/`, `services/agent/src/siteops_agent/` and `services/tickets/src/siteops_tickets/`, installed as `siteops-common`, `siteops-rag`, `siteops-agent` and `siteops-tickets`; services depend on `siteops-common = { workspace = true }`. Every Dockerfile copies all members' `pyproject.toml` (the workspace needs them to resolve the lock) but only `common` and its own service's code.
 
 ### arch/5 — Which of my own modules become separate services
 
@@ -127,6 +132,10 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - **Reranker:** module of the RAG pipeline, in-process behind its interface. Can move to an inference server (TEI `/rerank`) via arch/2 if evals justify it.
 - **Ingestion:** a **job**, not a service: a one-off container (`docker compose run ingest`) that parses PDFs, writes to the vector store, and exits.
 - **Cost:** inference servers are extra containers to run and health-check; their network calls inherit arch/1's costs.
+- **As built (2026-11-02):**
+  - **Embedding:** Ollama's OpenAI-compatible endpoint serving `bge-m3` (rag/5), through `embedder/openai_compat.py`; the same server runs the LLM.
+  - **Reranker:** not built, cut from this version (scope/3, amended).
+  - **Ingestion:** the compose service `ingest` in the `jobs` profile, so `up` doesn't start it: `make ingest` (`docker compose run --rm ingest`) runs `scripts/ingest.py` over `data/` and exits. Its image is rag's with the `docling` extra added; the rag API image doesn't carry Docling.
 
 ### arch/6 — MCP transport for the tickets server
 
@@ -154,10 +163,14 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 
 ### arch/8 — Persistence: Docker volumes for Qdrant and SQLite
 
-**Status:** Open · **Priority:** P2
+**Status:** Decided (2026-11-02, as built)
 
 - Named volumes vs bind mounts; what survives `docker compose down`.
 - **Tickets, as built (2026-11-01):** named volume `tickets-data` mounted at `/data` (`TICKETS_DB_PATH=/data/tickets.db`): survives `down` and restarts (checked: dedup holds across a restart), removed by `down -v`. Qdrant still open.
+- **Decision (2026-11-02): named volumes for what services write, read-only bind mounts for what they read.**
+  - Named: `qdrant-data` (the ingested runbooks), `tickets-data` (the SQLite file), `docling-cache` (Docling's models, for the `ingest` job) and, with the GPU overlay, `ollama-models`. All survive `make down`; `docker compose down -v` removes them.
+  - Bind-mounted read-only: `data/` into the `ingest` job, `data/logs/` into the agent (`site.log`, written on the host by `make generate-logs`).
+- **Not persisted:** triage runs and their reports, kept in the agent's memory (agent/8). Losing a volume costs a re-ingest or the ticket history, both reproducible (arch/10).
 
 ### arch/9 — Distributed tracing (OpenTelemetry)
 
@@ -182,12 +195,19 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 
 ### arch/12 — `docker compose up` gives a fully working environment
 
-**Status:** Open (2026-11-01) · **Priority:** P2
+**Status:** Decided (2026-11-02, as built)
 
 - **Goal:** `docker compose up` alone (plus a `.env` with the secrets, design/4) starts everything `/ask` and `/triage` need, end to end, with no service run by hand.
-- **Today:** only `tickets` is in `docker-compose.yml`. rag's image reads `config.docker.yaml`, which assumes a `qdrant` service on the compose network and Ollama on the host at `host.docker.internal:11434`.
+- **Then (2026-11-01):** only `tickets` is in `docker-compose.yml`. rag's image reads `config.docker.yaml`, which assumes a `qdrant` service on the compose network and Ollama on the host at `host.docker.internal:11434`.
 - **To add:** `rag`, `qdrant` (with its volume, arch/8), the `ingest` job (`docker compose run ingest`, arch/5), `agent` once its container exists, and health checks with `depends_on` so services start in order.
 - **To decide:** Ollama in compose (self-contained, but a 27B model needs a GPU passed through) or on the host (`extra_hosts: host-gateway` on Linux); whether ingestion runs automatically on first start or stays a manual `run`.
+- **Decision (2026-11-02), as built:**
+  - **The stack:** `qdrant`, `rag`, `tickets`, `agent`, an `ollama` entry and the `ingest` job (arch/5). Health checks and `depends_on` start them in order (qdrant → rag; rag and tickets → agent); `make up` is `docker compose up -d --build --wait`. Every port is published on 127.0.0.1 only, defaults overridable in `.env`.
+  - **The model server stays on the host by default.** The `ollama` service is a TCP forwarder (`alpine/socat`) to the host's Ollama, or to any OpenAI-compatible server set in `LLM_UPSTREAM`. rag and the agent call it `ollama.internal`, since a host Ollama refuses requests whose Host header is `ollama`. `docker-compose.gpu.yml` replaces it with Ollama itself on an NVIDIA GPU (`make up-gpu`, then `make models` once).
+  - **Ingestion stays manual:** `make ingest`, once or when the runbooks change. **Logs** are generated on the host (`make generate-logs`) and mounted into the agent.
+  - **Secrets:** one root `.env` (from `.env.example`) holds `TICKETS_API_KEY` and `AGENT_API_KEY`; compose passes them to each service under its own names (design/4). Each image reads its `config.docker.yaml`.
+  - `tests/test_stack.py` fails if the configs, Dockerfiles, port mappings and health checks disagree on ports, service names, aliases, mounts or models.
+- **Cost:** `make up` alone isn't self-contained: it needs a model server on the host (or `up-gpu`), the models pulled, `make ingest` once and `make generate-logs` before the agent can triage.
 
 ---
 
@@ -202,6 +222,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - **Why:** no component depends on a single technology; tests run on fakes/in-memory adapters.
 - **Cost:** more files; each interface must have ≥2 implementations (one real, one fake) to justify existing. This rule is what stops speculative interfaces; it also keeps implementation details from leaking into the interface and makes testing easy.
 - **Amended (2026-11-01): a framework's own abstraction counts as the interface.** When a framework we adopt already ships an interface with real and fake implementations, we use it instead of wrapping it in our own ABC. First case: the agent's chat model is LangChain's `BaseChatModel` (agent/4); production uses its OpenAI-compatible / Ollama implementation, tests use `langchain_core`'s fake chat models. The agent has no `llm/` package. The rag service keeps its own `llm/` ABC, since it uses no framework.
+- **Interfaces as built (2026-11-02):** rag: `AbstractDocumentConverter` (`converter/`: Docling, and a plain-text one as the light second), `Embedder`, `VectorStore`, `ChatModel` (`llm/`). Agent: `RagClient`, `TicketSink`, `LogSource`, and `LogParser` (one adapter, agent/9's exception). `Reranker` is gone with the reranker (scope/3, amended).
 
 ### design/2 — Interfaces via `abc.ABC` (not `typing.Protocol`)
 
@@ -212,9 +233,10 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 
 ### design/3 — Single composition root
 
-**Status:** Proposed
+**Status:** Decided (2026-11-02, as built)
 
 - Only one place (`container.py` / factory) reads env and instantiates concrete adapters; everything else receives dependencies via `__init__`.
+- **As built:** rag's `container.py` (`build_rag` for the API, `build_pipeline` for ingestion) and the agent's (`build_job` for the CLI and the API's runs, `build_api` for the HTTP app) are the only code that picks adapters. Optional extras are imported inside them, so a module never imports an adapter it might not have (tooling/2). The tickets service is small enough that `server.py` is both its entry point and its root. An entry point may load `Settings` itself to pass them in and to read its own host and port (`api/main.py`).
 
 ### design/4 — Configuration: YAML for settings, `.env` for secrets only
 
@@ -227,7 +249,8 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - **Values that stay in code:** the prefilter's context sizes, window cap and `RULES` (agent/9, agent/12); the wire contracts' limits (`top_k` ≤ 50, ticket field lengths), which are part of the API, not tuning.
 - **Why:** one place to read the whole configuration of a service, reviewed in git; secrets kept out of it.
 - **Cost:** every environment that differs needs its own YAML file instead of a one-line env override.
-- **Implemented (2026-11-01)** in all three services' `config.py`: env vars and `.env` are wrapped so that only the keys in `SECRETS` pass (any other key is an error), and the YAML source refuses those keys. Secrets: `RAG_EMBEDDING__API_KEY`, `RAG_LLM__API_KEY`, `TICKETS_API_KEY`, `AGENT_TICKETS__API_KEY`, listed in each service's `.env.example`. The rag and tickets images use their `config.docker.yaml` (`RAG_CONFIG_FILE`, `TICKETS_CONFIG_FILE`); rag's reaches Ollama on the host (`host.docker.internal:11434`) and Qdrant as `qdrant:6333`, and a test keeps its non-URL values equal to `config.yaml`'s. The agent's `Settings` (rag client, ticket sink) exists, but nothing reads it until its `container.py` is written.
+- **Implemented (2026-11-01)** in all three services' `config.py`: env vars and `.env` are wrapped so that only the keys in `SECRETS` pass (any other key is an error), and the YAML source refuses those keys. Secrets: `RAG_EMBEDDING__API_KEY`, `RAG_LLM__API_KEY`, `TICKETS_API_KEY`, `AGENT_TICKETS__API_KEY`, listed in each service's `.env.example`. The rag and tickets images use their `config.docker.yaml` (`RAG_CONFIG_FILE`, `TICKETS_CONFIG_FILE`); rag's reaches Ollama on the host (`host.docker.internal:11434`) and Qdrant as `qdrant:6333`, and a test keeps its non-URL values equal to `config.yaml`'s.
+- **Amended (2026-11-02), the agent:** its `container.py` reads the `Settings`; its secrets are `AGENT_TICKETS__API_KEY` and `AGENT_API__API_KEY` (the API's, optional for the CLI). Its image reads `config.docker.yaml` (`AGENT_CONFIG_FILE`), which differs from `config.yaml` only in where rag, tickets, the model and the log file are. Under compose, a single root `.env` holds the secrets and compose maps them to each service's names (`TICKETS_API_KEY` → `AGENT_TICKETS__API_KEY` too, `AGENT_API_KEY` → `AGENT_API__API_KEY`, arch/12).
 
 ---
 
@@ -235,22 +258,25 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 
 ### rag/1 — Vector store: Qdrant (not Pinecone)
 
-**Status:** Proposed
+**Status:** Decided (2026-11-02, as built)
 
 - **Why:** on-prem, matches target stack, `:memory:` mode for tests. Pinecone is SaaS-only.
+- **As built:** Qdrant 1.20 (server image and `qdrant-client`), behind `VectorStore`, with `InMemoryVectorStore` as the fake; `vector_store.backend: memory | qdrant` picks one. One contract suite runs on the memory store, Qdrant `:memory:`, and a Qdrant server when one is running (tooling/5).
 
 ### rag/2 — Chunker consumes own `Element` IR, not Docling objects
 
-**Status:** Proposed
+**Status:** Decided (2026-11-02, as built)
 
 - `Element(kind=heading|paragraph|table, text, page)`; `DocumentParser` adapters produce it.
 - **Why:** chunker is pure and unit-testable without PDFs or Docling installed.
+- **As built:** `Element(kind, text, page, level, rows, language)` in `models.py`, with kinds `heading`, `paragraph`, `table`, `code` and `caption`; `level` for headings (0 = the title), `rows` for tables, `language` for code. The interface is `AbstractDocumentConverter.convert_to_elements`. Ingestion uses the Docling converter for all five formats (md, txt, html, docx, pdf); `converter/text.py` handles plain text without Docling.
 
 ### rag/3 — Deterministic `chunk_id`
 
-**Status:** Proposed
+**Status:** Decided (2026-11-02, as built)
 
 - Derived from content + source (hash), so re-ingestion upserts instead of duplicating.
+- **As built:** `uuid5` of `source | heading path | text` under a fixed namespace (`chunking.py`): a valid Qdrant point ID, and stable across runs and machines. Stale chunks of an edited document are removed by rag/12.
 
 ### rag/4 — LLM: model and serving runtime
 
@@ -261,15 +287,19 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 
 ### rag/5 — Embedding model
 
-**Status:** Open · **Priority:** P1
+**Status:** Decided (2026-11-02, as built)
 
 - Which model, and its vector size (fixes the Qdrant collection). Whether it runs in-process or as a service is arch/5.
+- **As built:** `bge-m3`, 1024 dimensions, served by Ollama through its OpenAI-compatible API (the same server as the LLM, rag/4), batches of 32 (`embedding:` in `config.yaml`). On the golden set: recall@5 0.956, recall@10 0.989, MRR 0.841 at k = 5 (`data/eval_history.jsonl`).
+- **Cost:** changing the model or its dimension means recreating the collection and re-ingesting. No other model was compared.
 
 ### rag/6 — Chunking strategy
 
-**Status:** Open · **Priority:** P2
+**Status:** Decided (2026-11-02, as built)
 
 - Split by heading/section vs fixed size; size and overlap; tables kept whole or split.
+- **As built (`Chunker`, `chunking.py`):** by section, up to `chunking.max_length` = 1000 characters, the heading prefix included (rag/14). Phase 1 splits each element that doesn't fit into pieces, never mid-sentence, mid-row or inside a code block; phase 2 packs the consecutive pieces of one section into as few chunks as fit. A chunk never spans two sections. Tables are split by rows with the header repeated in every chunk; a row too long for table form becomes one `column: value` line per cell. **No overlap**: every chunk carries its heading path instead.
+- **Cost:** a section's start and end can land in different chunks with no shared text. No other size was compared on the eval.
 
 ### rag/7 — Retrieval depth
 
@@ -279,16 +309,18 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - **Where k is set (2026-11-01):** `retrieval.top_k` in `services/rag/config.yaml` (1–50) is used when a `/search` or `/ask` request sends no `top_k`; the contracts' `top_k` is optional (`None` = the service's default), so the number lives in one place. `scripts/run_eval.py` uses the same value unless `--top-k` is given. On the 91-question golden set, recall@5 is 0.956 and recall@10 0.989.
 - **Decision (2026-11-01): the default is 10**, in `config.yaml` and as the code default when there is no file. Recall@10 is 0.989 against 0.956 at 5: about 3 more questions in 100 get the right runbook into the context.
 - **Cost:** twice the context for `/ask`, so slower answers on the local model. The triage agent's `search_runbooks` can still ask for fewer (the probe used 3). How many chunks the reranker keeps is rag/8's.
+- **Amended (2026-11-02):** with no reranker (scope/3, amended), the k fetched is the k given to the LLM. The agent asks for `hits_per_search` = 3 per search (`triage:` in its `config.yaml`).
 
 ### rag/8 — Reranker model
 
-**Status:** Open · **Priority:** P2
+**Status:** Deferred (2026-11-02)
 
 - Which cross-encoder (or alternative). Value proven per scope/3.
+- Deferred with the reranker itself (scope/3, amended).
 
 ### rag/9 — "I don't know" rule
 
-**Status:** Proposed · **Priority:** P2
+**Status:** Decided (2026-11-02, as built)
 
 - Score threshold on retrieved chunks, LLM judgment, or both.
 - **Recommendation (implemented in `rag.py`):** LLM judgment, checked. Nothing retrieved → "I don't know" without calling the LLM; otherwise the answer counts only if at least one of its citations passes rag/10's check. `AskResponse.answered` carries the result.
@@ -298,7 +330,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 
 ### rag/10 — Citation format and check
 
-**Status:** Proposed · **Priority:** P2
+**Status:** Decided (2026-11-02, as built)
 
 - Cite by page, section or chunk ID; how a citation is verified to exist in the retrieved context.
 - **Recommendation (implemented in `rag.py`):** the LLM gets numbered excerpts and replies in JSON with `{"excerpt": n, "quote": "..."}` citations. A citation is kept only if `n` is a retrieved excerpt and the quote appears in its text word for word (whitespace ignored). `Citation` carries `chunk_id`, source, heading path, page and the quote.
@@ -378,6 +410,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - Tools are written once, as LangChain tools, so the chat agent (agent/11) can reuse them later.
 - **Report (implemented, `report.py`):** a run returns a `TriageReport` (range, model, events read, unparsable, `totals` by status) with one `WindowOutcome` per window: its id (`Window.id`, a hash of host, rule and span, stable across runs), host, rule and span, a status (`ticketed`, `deduplicated`, `dismissed`, `unresolved`, `error`) with its details (draft and ticket id, dismissal, or error), the searches made and the chunks they returned, rejected `create_ticket` calls, LLM calls and duration. The eval scores this report, not the tickets store.
 - **Limits:** `max_steps_per_window` (graph recursion limit) and `max_searches_per_window`; a window that exhausts its budget is reported as unresolved, never ticketed. The values are set when the graph is built. A cap on LLM calls per run and a per-window timeout are added only if a run misbehaves.
+  - **As built (2026-11-02):** the budget is `max_llm_calls` per window (8), with the graph's recursion limit derived from it (`2 × max_llm_calls + 2`), plus `max_searches` (3), `max_log_queries` (2) and `hits_per_search` (3), all under `triage:` in `config.yaml`. A model that answers in plain text gets one reminder before the window ends unresolved.
 - **The window's tools (2026-11-01):** `TriageTools` (`triage_tools.py`, CORE) is made fresh for every window and holds its memory: the lines shown and their numbers, the passages retrieved (only those may be cited), the searches and lookups made, the refused drafts and the decision. Its four methods are the tools; `tools.py` (FLOW) hands them to LangChain with their descriptions and their schemas as JSON, so the raw arguments reach `TriageTools`, which validates them itself.
   - **Two kinds of failure, kept apart:** the model's mistake (invalid arguments, a failed check, a budget used up) comes back to it as a refusal in plain words, and the window goes on; ours (rag or tickets down) raises `ToolFailure` and ends the window as `error`. The tool probe showed why: a failure in our sink, sent back as "try again", made the model retry nine times for nothing.
   - **Budgets per window** (`ToolLimits`, values from the config): searches, `log_context` calls, hits per search. A used-up budget is a refusal ("decide with what you have"), not an error.
@@ -386,13 +419,14 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 
 ### agent/5 — Auth for the API and the MCP server
 
-**Status:** Proposed · **Priority:** P2
+**Status:** Decided (2026-11-02, as built)
 
 - API key only? How keys are issued, stored and checked (the tickets store already plans an API-key check).
 - **Recommendation (implemented in the tickets service):** one shared key, `TICKETS_API_KEY`, from the environment (compose takes it from the shell or a git-ignored `.env`), at least 16 characters; the service refuses to start without it. Clients send `Authorization: Bearer <key>`; an ASGI middleware compares it in constant time (`hmac.compare_digest`) and answers 401 otherwise. `/health` needs no key. The port is published on 127.0.0.1 only.
 - **Why:** the only client is the agent, inside the compose network; per-client keys, rotation and scopes belong at the edge (arch/11).
 - **Cost:** one key for every client: no per-client revocation or audit of who opened a ticket. Rotating it means restarting the service and the agent.
 - **The agent's API (2026-11-01)** uses the same scheme: `AGENT_API__API_KEY` (a secret, design/4), `Authorization: Bearer`, compared in constant time, `/health` exempt. Only `api.py` needs it, so the setting is optional and the CLI runs without it; the API refuses to start without one.
+- **As built (2026-11-02):** both services check the key in an ASGI middleware and answer `401` without it (the agent's with `{"detail", "code": "unauthorized"}`). rag's `/search` and `/ask` have no key: rag is reached only on the compose network and on 127.0.0.1, and its only clients are the agent and the developer.
 
 ### agent/6 — Scheduled / watcher-triggered triage
 
@@ -430,6 +464,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
   - `GET /windows?since&until` previews the prefilter's windows (counts, no log text, no LLM): the debugging entry point.
   - Runs are kept in memory (the last 50; past that the oldest finished ones are dropped, never a queued or running one): a restart forgets them, not their tickets. Writing reports to a volume is arch/8's, not done.
   - Routes only: the work is `TriageRuns` (`runs.py`) and the job built by `container.py`; handlers are plain `def`, so the synchronous graph and the MCP sink's own event loop run off the server's loop.
+- **Amended (2026-11-02), chat out again:** `/chat` and its engine are removed until one is built (agent/15, amended; agent/11 stays Proposed). This version's API is `/health`, `/triage` and `/windows`. It is the `api/` package (one router per area), built by `container.build_api`, started by `api/main.py`, and runs in compose as the `agent` service (arch/12).
 
 ### agent/9 — Log parser and prefilter: contract
 
@@ -551,6 +586,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - **Not built:** `GET /runbooks/section` (it needs rag to return a chunk's neighbours, which the tool probe showed adds nothing for triage), streaming steps over SSE, per-user auth (agent/2).
 - **Cost:** the draft secret must be shared by every API process, or a draft signed by one fails on another; the API runs as one process (agent/8). A draft expires after 30 minutes and must be written again.
 - **Amended (2026-11-02), chat removed for now:** the agent's API serves `/health`, `/triage` and `/windows` only. `/chat`, `/tickets`, `/meta`, the turn contract (`chat/`) and the signed drafts (`drafts.py`) are removed until a chat engine is built (agent/11 stays Proposed); they are in git history (commit `6503461`). The service is built by `container.build_api` and started by `api/main.py`.
+  - **Error codes in use:** `invalid_request` 422, `unauthorized` 401, `queue_full` 503 (with `Retry-After`), `run_not_found` 404; any other HTTP error becomes `http_<status>`. The rest of the list above goes with chat.
 
 ---
 
@@ -571,12 +607,14 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - Consequence: adapters are imported lazily by the composition root, so `import site_ops` works without any extra.
 - **Why:** core installs with zero vendor tech (enforces design/1); each service image installs only its extras (arch/1).
 - **Amended (2026-11-01):** a service's core may depend on the framework it is built on. The agent requires `langgraph` and `langchain-core` (agent/4); its adapters stay extras (`openai-compat`, `mcp`, `http`).
+- **Extras as built (2026-11-02):** rag: `openai-compat`, `qdrant`, `docling`; its core also requires FastAPI and uvicorn, since the API is the service. Agent: `openai-compat`, `mcp`, `http`, `api` (FastAPI and uvicorn; the CLI doesn't need them). Tickets has no extras: its only adapter is its own store. Each image installs the extras it uses through its Dockerfile's `EXTRAS` argument; the `ingest` job builds rag's image with `docling` added. The package is `siteops_rag`, not `site_ops` (arch/4, names as built).
 
 ### tooling/3 — Test tiers via pytest markers
 
 **Status:** Decided (2026-10-27)
 
 - Default `pytest` runs unit + contract (fast, no network). `integration` and `eval` are opt-in markers; `--strict-markers` on.
+- **As built (2026-11-02):** `integration` tests skip whatever isn't running (Qdrant, Ollama, rag). The `eval` marker is declared but no test uses it yet: the retrieval and `/ask` eval is `scripts/run_eval.py`, which appends each run to `data/eval_history.jsonl`. `make test` and `make test-integration` run the two tiers.
 
 ### tooling/4 — Lint + type check: `ruff` + `mypy` strict
 
@@ -587,12 +625,15 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 
 ### tooling/5 — Contract tests per interface
 
-**Status:** Proposed
+**Status:** Decided (2026-11-02, as built)
 
 - One test suite per interface, parametrized over all implementations (e.g. InMemory + Qdrant `:memory:`).
+- **As built:** `VectorStore` (memory, Qdrant `:memory:`, Qdrant server under `integration`), `LogSource` (memory, file) and `TicketSink` (memory, MCP against a stand-in tickets server on a local port), each in its folder's `test_base.py`. `Embedder`'s `test_base.py` tests the checks its base class makes for every adapter. The model adapters are tested on their own, the real ones under `integration`.
 
 ### tooling/6 — CI pipeline
 
-**Status:** Open · **Priority:** P2
+**Status:** Decided (2026-11-02, as built)
 
 - GitHub Actions running ruff, mypy and the default (unit + contract) test tier; whether `eval` runs in CI.
+- **As built (`.github/workflows/ci.yml`):** on every pull request and push to `main`, three jobs: `lint` (`ruff check`), `test` (the default tier) and `integration` (all extras installed, `mypy`, then `pytest -m integration` with a Qdrant 1.20 service container; tests that need Ollama skip themselves). mypy runs in the job with the extras, since it needs Docling's types.
+- **Not in CI:** the eval (it needs the 27B model) and `ruff format --check`, which `make lint` runs.
