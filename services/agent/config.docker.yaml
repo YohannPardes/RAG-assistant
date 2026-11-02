@@ -1,0 +1,32 @@
+# the image's config (AGENT_CONFIG_FILE in the Dockerfile): config.yaml with the container's view of its neighbours
+rag:
+  base_url: http://rag:8000           # the rag service on the compose network
+  timeout: 10.0
+  retries: 2
+
+tickets:
+  url: http://tickets:8000/mcp        # the tickets service on the compose network
+  timeout: 10.0
+  retries: 2
+
+llm:
+  base_url: http://ollama.internal:11434/v1   # the model server, as compose names it (your host's Ollama by default)
+  model: qwen3.5:27b
+  reasoning_effort: "none"
+  temperature: 0.0
+  seed: 7
+  timeout: 120.0
+  max_retries: 2
+
+triage:
+  max_llm_calls: 8
+  max_searches: 3
+  max_log_queries: 2
+  hits_per_search: 3
+
+logs:
+  path: /data/logs/site.log   # data/logs, mounted read-only by docker-compose.yml
+
+api:
+  host: 0.0.0.0               # reachable from other containers: the API key is the access check
+  port: 8000

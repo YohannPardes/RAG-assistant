@@ -1,6 +1,6 @@
 # the image's config (RAG_CONFIG_FILE in the Dockerfile): config.yaml with the container's view of its neighbours
 embedding:
-  base_url: http://host.docker.internal:11434/v1   # Ollama on the host machine (Linux: extra_hosts host-gateway)
+  base_url: http://ollama.internal:11434/v1   # the model server, as compose names it (your host's Ollama by default)
   model: bge-m3
   dimension: 1024
   batch_size: 32
@@ -8,7 +8,7 @@ embedding:
   max_retries: 3
 
 llm:
-  base_url: http://host.docker.internal:11434/v1   # Ollama on the host machine
+  base_url: http://ollama.internal:11434/v1
   model: qwen3.5:27b
   reasoning_effort: "none"
   temperature: 0.0

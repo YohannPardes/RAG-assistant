@@ -1,19 +1,92 @@
+# The whole stack: make up (or docker compose up -d). Secrets in .env (see .env.example).
+# Every image is built from the repo root and can also run on its own, with its own config file mounted
+# (RAG_CONFIG_FILE / AGENT_CONFIG_FILE / TICKETS_CONFIG_FILE). Host ports default to the dev ones; override them in .env.
+# Every service of ours listens on 8000 inside its container (its config.docker.yaml, or rag's Dockerfile CMD);
+# tests/test_stack.py fails if a config, a Dockerfile, a port mapping or this health check disagrees.
+x-health: &health
+  test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+  interval: 10s
+  timeout: 3s
+  retries: 6
+
 services:
+  ollama:                                    # the model server, as rag and the agent name it: a forwarder to one on the host
+    image: alpine/socat:1.8.0.3              # docker-compose.gpu.yml replaces it with Ollama itself (make up-gpu)
+    command: ["tcp-listen:11434,fork,reuseaddr", "tcp:${LLM_UPSTREAM:-host.docker.internal:11434}"]  # any OpenAI-compatible server
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # Linux; Docker Desktop resolves it already
+    networks:
+      default:
+        aliases: [ollama.internal]           # the name rag and the agent use: a host Ollama refuses requests for "ollama"
+
+  qdrant:
+    image: qdrant/qdrant:v1.20.0
+    volumes:
+      - qdrant-data:/qdrant/storage          # the ingested runbooks survive `down` (not `down -v`)
+    ports:
+      - "127.0.0.1:${QDRANT_PORT:-6333}:6333"
+    healthcheck:
+      test: ["CMD", "bash", "-c", ":> /dev/tcp/127.0.0.1/6333"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  rag:                                       # /ask, /search
+    build:
+      context: .                             # repo root: every image needs packages/common too
+      dockerfile: services/rag/Dockerfile
+    depends_on:
+      qdrant: { condition: service_healthy }
+      ollama: { condition: service_started }
+    ports:
+      - "127.0.0.1:${RAG_PORT:-8000}:8000"
+    healthcheck: *health
+
+  ingest:                                    # a job, not a service: make ingest (docker compose run --rm ingest)
+    profiles: [jobs]
+    build:
+      context: .
+      dockerfile: services/rag/Dockerfile
+      args:
+        EXTRAS: "--extra openai-compat --extra qdrant --extra docling"   # docling: PDF and DOCX parsing, only needed here
+    command: ["python", "scripts/ingest.py"]   # data/, every subfolder: the runbooks are in data/runbooks
+    volumes:
+      - ./scripts:/app/scripts:ro
+      - ./data:/app/data:ro                  # the script's default folder
+      - docling-cache:/root/.cache           # docling's models, downloaded on the first run
+    depends_on:
+      qdrant: { condition: service_healthy }
+      ollama: { condition: service_started }
+
   tickets:                                   # MCP server: create_ticket over streamable HTTP at /mcp
     build:
-      context: .                             # repo root: the image needs packages/common too
+      context: .
       dockerfile: services/tickets/Dockerfile
     environment:
-      TICKETS_API_KEY: ${TICKETS_API_KEY:?set TICKETS_API_KEY (16+ characters) in the shell or in .env}
+      TICKETS_API_KEY: ${TICKETS_API_KEY:?set TICKETS_API_KEY (16+ characters) in .env}
     ports:
-      - "127.0.0.1:8002:8000"                # this machine only, for running the agent outside compose
+      - "127.0.0.1:${TICKETS_PORT:-8002}:8000"
     volumes:
-      - tickets-data:/data                   # the SQLite file survives `docker compose down` (not `down -v`)
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
+      - tickets-data:/data                   # the SQLite file survives `down` (not `down -v`)
+    healthcheck: *health
+
+  agent:                                     # POST /triage, GET /triage[/{run_id}], GET /windows
+    build:
+      context: .
+      dockerfile: services/agent/Dockerfile
+    environment:
+      AGENT_TICKETS__API_KEY: ${TICKETS_API_KEY:?set TICKETS_API_KEY in .env}
+      AGENT_API__API_KEY: ${AGENT_API_KEY:?set AGENT_API_KEY (16+ characters) in .env}
+    volumes:
+      - ./data/logs:/data/logs:ro            # site.log, from make generate-logs
+    depends_on:
+      rag: { condition: service_healthy }
+      tickets: { condition: service_healthy }
+    ports:
+      - "127.0.0.1:${AGENT_PORT:-8001}:8000"
+    healthcheck: *health
 
 volumes:
+  qdrant-data:
   tickets-data:
+  docling-cache:

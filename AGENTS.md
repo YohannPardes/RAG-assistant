@@ -20,7 +20,12 @@ Every service has its own `Dockerfile`, built with the repo root as build contex
 
 ```
 rag_project/
-├── pyproject.toml   uv.lock   .python-version   Makefile   docker-compose.yml   README.md   AGENTS.md   CLAUDE.md (imports AGENTS.md)
+├── pyproject.toml   uv.lock   .python-version   README.md   AGENTS.md   CLAUDE.md (imports AGENTS.md)
+├── Makefile                   make help: the stack (up, up-gpu, down, ingest, triage…) and the dev checks
+├── docker-compose.yml         ollama (a forwarder to the host's model server), qdrant, rag, tickets, agent; the ingest job
+├── docker-compose.gpu.yml     make up-gpu: Ollama itself in the stack, on the GPU
+├── .env.example               what compose reads: the two API keys, optional LLM_UPSTREAM and host ports
+├── .dockerignore              what no image build sees: .env files, tests, data, .venv, .git
 ├── .github/workflows/ci.yml    CI on push / PR
 ├── docs/DECISIONS.md
 │
@@ -71,7 +76,7 @@ rag_project/
 │           └── images/                    diagrams (cert_renewal.png is referenced by the .md)
 │
 ├── services/agent/
-│   ├── pyproject.toml   Dockerfile   config.yaml   .env.example
+│   ├── pyproject.toml   Dockerfile   config.yaml   config.docker.yaml (the image's)   .env.example
 │   ├── src/siteops_agent/
 │   │   ├── api/                ENTRY   one router per area, assembled in app.py (agent/15)
 │   │   │   ├── app.py          ApiParts, build_app: the routers, the key check, the error shape
@@ -128,6 +133,7 @@ rag_project/
 │       └── test_config.py      the real configs load; the key only from env / .env, settings only from the YAML
 │
 ├── tests/                      SYSTEM  cross-service only
+│   ├── test_stack.py           the stack's shared values agree: ports, service names, aliases, mounts, models
 │   ├── e2e/                    agent → rag → tickets for real: conftest.py (the tickets app on a local port)  test_agent_to_tickets.py  test_agent_to_rag.py
 │   └── eval/                   recall@5, triage precision/recall
 ├── scripts/                    ingest.py, generate_logs.py, run_eval.py
