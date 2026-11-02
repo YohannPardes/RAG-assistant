@@ -60,7 +60,7 @@ rag_project/
 │       ├── integration/            marked `integration`; run with `pytest -m integration`; skips what isn't running
 │       │   ├── conftest.py         docling_converter, Ollama and live settings, `ingested` (fixtures ingested once)
 │       │   ├── test_api.py         real lifespan: /search, /ask answered and "I don't know"
-│       │   ├── test_golden_set.py  every golden-set label names a section that ingesting data/runbooks produces
+│       │   ├── test_golden_set.py  every golden-set label names a section that ingesting data/ produces
 │       │   ├── converter/test_docling.py
 │       │   ├── embedder/test_ollama.py   llm/test_ollama.py
 │       │   ├── ingestion/test_pipeline.py
@@ -131,5 +131,5 @@ rag_project/
 │   ├── e2e/                    agent → rag → tickets for real: conftest.py (the tickets app on a local port)  test_agent_to_tickets.py  test_agent_to_rag.py
 │   └── eval/                   recall@5, triage precision/recall
 ├── scripts/                    ingest.py, generate_logs.py, run_eval.py
-└── data/                       runbooks/ (30 runbooks in md/txt/html/docx/pdf, read by scripts/ingest.py; the 4 fixture runbooks are copied from services/rag/tests/fixtures/), logs/ (site.log and ground_truth.json, written by scripts/generate_logs.py; site.log is git-ignored), golden_set.jsonl, eval_history.jsonl (one line per scripts/run_eval.py run)
+└── data/                       runbooks/ (30 runbooks in md/txt/html/docx/pdf; scripts/ingest.py reads all of data/, warns about the other files and names each runbook runbooks/<file>; the 4 fixture runbooks are copied from services/rag/tests/fixtures/), logs/ (site.log and ground_truth.json, written by scripts/generate_logs.py; site.log is git-ignored), golden_set.jsonl, eval_history.jsonl (one line per scripts/run_eval.py run)
 ```

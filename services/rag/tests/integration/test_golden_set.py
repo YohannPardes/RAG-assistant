@@ -14,19 +14,16 @@ from siteops_rag.models import Document
 pytestmark = pytest.mark.integration
 
 DATA_DIR = Path(__file__).resolve().parents[4] / "data"
-GOLDEN_SET = [
-    json.loads(line)
-    for line in (DATA_DIR / "golden_set.jsonl").read_text(encoding="utf-8").splitlines()
-    if line.strip()
-]
+GOLDEN_SET = [json.loads(line) for line in (DATA_DIR / "golden_set.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
 @pytest.fixture(scope="module")
 def sections(docling_converter, ingest_script: ModuleType, configured: Settings) -> set[tuple[str, str]]:
-    """(source, last heading) of every chunk of data/runbooks, chunked the way the configured pipeline does it."""
+    """(source, last heading) of every chunk ingesting data/ produces, chunked the way the configured pipeline does it."""
     chunker = Chunker(max_length=configured.chunking.max_length)
     found = set()
-    for raw in ingest_script.load_documents(DATA_DIR / "runbooks"):
+    documents, _ = ingest_script.load_documents(DATA_DIR)
+    for raw in documents:
         elements = docling_converter.convert_to_elements(raw)
         for chunk in chunker.chunk_elements(Document(source=raw.source, elements=elements)):
             if chunk.heading_path:

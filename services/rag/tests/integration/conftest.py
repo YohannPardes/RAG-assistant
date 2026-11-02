@@ -91,6 +91,6 @@ def ingested(live_settings: Settings, ingest_script: ModuleType, fixtures_dir: P
     pytest.importorskip("docling")
     from siteops_rag.container import build_pipeline
 
-    skipped = build_pipeline(live_settings).run_batch(ingest_script.load_documents(fixtures_dir))
+    skipped = build_pipeline(live_settings).run_batch(ingest_script.load_documents(fixtures_dir)[0])
     assert skipped == []
     return live_settings

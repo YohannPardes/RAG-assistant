@@ -109,7 +109,7 @@ def test_every_seeded_fault_type_is_one_a_ticket_can_carry(generate_logs) -> Non
 
 
 def test_every_expected_runbook_is_a_runbook_of_the_corpus(generate_logs) -> None:
-    missing = [f.expected_runbook for f in generate_logs.FAULTS if not (REPO_ROOT / "data" / "runbooks" / f.expected_runbook).is_file()]
+    missing = [f.expected_runbook for f in generate_logs.FAULTS if not (REPO_ROOT / "data" / f.expected_runbook).is_file()]
 
     assert missing == []
 
