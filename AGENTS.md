@@ -31,26 +31,26 @@ rag_project/
 │
 ├── packages/common/
 │   ├── pyproject.toml          name: siteops-common
+│   ├── README.md               the contracts and the rules for changing them
 │   └── src/siteops_common/
 │       ├── __init__.py
 │       └── contracts.py        SHARED  AskRequest/Response, SearchRequest/Response, FaultType, TicketCreate, Ticket, CreateTicketResult (agent/10), fingerprint() (agent/3)
 │   └── tests/test_contracts.py   validation rules, wire round trip
 │
 ├── services/rag/
-│   ├── pyproject.toml   Dockerfile   config.yaml (every setting but secrets, design/4)   config.docker.yaml (the image's)   .env.example (the secrets' names)
+│   ├── pyproject.toml   Dockerfile   config.yaml (every setting but secrets, design/4)   config.docker.yaml (the image's)   .env.example (the secrets' names)   README.md
 │   ├── src/siteops_rag/
 │   │   ├── api.py              ENTRY   /ask, /search
 │   │   ├── container.py        ROOT    builds everything from config
 │   │   ├── config.py           ROOT    env settings (read only by container)
-│   │   ├── rag.py              CORE    retrieve → rerank → answer / "I don't know"
+│   │   ├── rag.py              CORE    retrieve → answer with checked citations / "I don't know" (no reranker, scope/3)
 │   │   ├── models.py           CORE    Element, Chunk (internal only)
 │   │   ├── ingestion/
 │   │   │   ├── chunking.py     CORE    Elements → Chunks
 │   │   │   └── pipeline.py     CORE    parse → chunk → embed → store  (run as a job)
-│   │   ├── converter/    base.py  docling.py  text.py      INTERFACE + ADAPTERS  document bytes → markdown
+│   │   ├── converter/    base.py  docling.py  text.py      INTERFACE + ADAPTERS  document bytes → Elements (Docling for all formats; text.py: plain text only)
 │   │   ├── embedder/     base.py  openai_compat.py  fake.py
 │   │   ├── vector_store/ base.py  qdrant.py   memory.py
-│   │   ├── reranker/     base.py  cross_encoder.py  passthrough.py
 │   │   └── llm/          base.py  openai_compat.py  fake.py
 │   └── tests/                  rag only; under unit/ and integration/, subfolders mirror src/
 │       ├── conftest.py             fixtures_dir, qdrant_url (skips without a Qdrant server) (shared)
@@ -76,7 +76,7 @@ rag_project/
 │           └── images/                    diagrams (cert_renewal.png is referenced by the .md)
 │
 ├── services/agent/
-│   ├── pyproject.toml   Dockerfile   config.yaml   config.docker.yaml (the image's)   .env.example
+│   ├── pyproject.toml   Dockerfile   config.yaml   config.docker.yaml (the image's)   .env.example   README.md
 │   ├── src/siteops_agent/
 │   │   ├── api/                ENTRY   one router per area, assembled in app.py (agent/15)
 │   │   │   ├── app.py          ApiParts, build_app: the routers, the key check, the error shape
@@ -121,7 +121,7 @@ rag_project/
 │           └── ticket_sink/         conftest.py (a stand-in tickets MCP server on a local port)  test_base.py (contract suite: memory + mcp)  test_mcp.py
 │
 ├── services/tickets/
-│   ├── pyproject.toml   Dockerfile   config.yaml   config.docker.yaml (the image's)   .env.example
+│   ├── pyproject.toml   Dockerfile   config.yaml   config.docker.yaml (the image's)   .env.example   README.md
 │   ├── src/siteops_tickets/
 │   │   ├── server.py           ENTRY + ROOT   streamable HTTP, API-key check, /health: transport and wiring only
 │   │   ├── tools.py            CORE    every MCP tool (create_ticket) and its LLM-facing description
