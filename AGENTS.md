@@ -56,7 +56,7 @@ rag_project/
 │       ├── conftest.py             fixtures_dir, qdrant_url (skips without a Qdrant server) (shared)
 │       ├── unit/                   fast tier, no optional extras
 │       │   ├── conftest.py         fake adapters, a RAG built on them, API clients
-│       │   ├── test_rag.py  test_api.py  test_config.py  test_container.py  test_ingest_script.py  test_eval_script.py
+│       │   ├── test_rag.py  test_api.py  test_config.py  test_container.py  test_ingest_script.py  test_eval_script.py  test_compare_evals_script.py
 │       │   ├── converter/test_text.py
 │       │   ├── embedder/           test_base.py  test_fake.py  test_openai_compat.py
 │       │   ├── ingestion/          test_chunking.py  test_pipeline.py
@@ -108,6 +108,7 @@ rag_project/
 │       └── unit/
 │           ├── conftest.py              generate_logs (the generator script, loaded from its path), a window and its search hits
 │           ├── test_generated_logs.py   scripts/generate_logs.py: determinism, fault windows, decoys, ground truth, every line parses
+│           ├── test_triage_eval_script.py   scripts/triage_eval.py's scoring and blame; run_eval.py prefilter end to end
 │           ├── test_models.py           LogEvent / Window: frozen and hashable, Window.id
 │           ├── test_prompts.py  test_decision.py  test_report.py  test_config.py  test_log_context.py  test_triage_tools.py  test_runs.py
 │           ├── test_container.py        the service built from the real config.yaml: routes behind the key, /windows
@@ -135,7 +136,8 @@ rag_project/
 ├── tests/                      SYSTEM  cross-service only
 │   ├── test_stack.py           the stack's shared values agree: ports, service names, aliases, mounts, models
 │   ├── e2e/                    agent → rag → tickets for real: conftest.py (the tickets app on a local port)  test_agent_to_tickets.py  test_agent_to_rag.py
-│   └── eval/                   recall@5, triage precision/recall
-├── scripts/                    ingest.py, generate_logs.py, run_eval.py
+│   └── eval/                   test_thresholds.py (`pytest -m eval`): each eval short, held to scope/5's thresholds
+├── scripts/                    ingest.py, generate_logs.py; run_eval.py (rag | prefilter | triage, each alone), triage_eval.py (its scoring), compare_evals.py
+├── eval_runs/                  git-ignored: one folder per eval run (report.md, failures.md, report.json, items.jsonl, seeded logs, transcripts)
 └── data/                       runbooks/ (30 runbooks in md/txt/html/docx/pdf; scripts/ingest.py reads all of data/, warns about the other files and names each runbook runbooks/<file>; the 4 fixture runbooks are copied from services/rag/tests/fixtures/), logs/ (site.log and ground_truth.json, written by scripts/generate_logs.py; site.log is git-ignored), golden_set.jsonl, eval_history.jsonl (one line per scripts/run_eval.py run)
 ```

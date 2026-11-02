@@ -67,6 +67,7 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 - **Matching rule (2026-11-01):** a ticket carries a `fault_type` chosen by the agent from a fixed list (a field of `TicketCreate`, added with the ticket contract), not inferred from its cited runbook, so the eval scores diagnosis and citation separately. A ticket matches a fault when it has the fault's type and its host is in the fault's `affected_hosts`. A fault is **detected** when at least one ticket matches it; further matching tickets are **duplicates**, reported as their own metric (not false positives, not hidden). A ticket that matches no fault is a false positive. Time is not part of the match: each fault type is seeded once and faults never overlap (scope/2).
 - **Why:** per-host windows (agent/9) see a fault's symptoms, not always its cause: a silent primary only shows up on other hosts. The agent's system prompt says "if the evidence points to another host as the cause, name that host in the ticket"; the duplicate count shows whether it does.
 - **Update (2026-11-01), categories and answers:** a golden-set question may carry a `category` (`lookup`, `exact_id`, `paraphrase`, `why`, `table`, `confusable`, `unanswerable`; default `uncategorized`) and `must_contain` (key facts). `scripts/run_eval.py` reports recall@k and MRR per category as well as overall, and with `--ask` scores `/ask`:
+- **Update (2026-11-02), the eval tooling:** `scripts/run_eval.py` has one subcommand per eval, each runnable alone: `rag` (the above; `--held-out` scores only the 20 `held_out` questions, two per covered runbook, picked with a fixed seed and otherwise left out, to check a gain on questions nothing was tuned on), `prefilter` (its recall over seeded logs, no LLM, and the prefilter-only baseline: every window a ticket) and `triage` (the agent over `--seeds`, `--repeats`, with budget and model overrides for ablations). Triage scores this entry's matching rule, plus misdiagnosed windows (a window on one fault ticketed as another, which may still count as that other's duplicate), decoys dismissed, root host and cited runbook, a windows × decisions matrix, and blames each missed fault on the first stage that lost it (prefilter: no window; retrieval: the expected runbook never offered; model: offered, still missed). The ground truth now lists the decoys (`decoys: {id, host, start, end, message}`). Each run prints a report, writes `eval_runs/<run_id>/` (report.md, failures.md for error analysis, report.json, items.jsonl: one flat row per item with the run's config, for analysis in code) and appends one line to `data/eval_history.jsonl`; `scripts/compare_evals.py` shows two runs' metric changes (a one-item move marked as noise) and the items that newly fail or pass. Run folders are not under `data/`, which ingestion reads whole.
   - **false-answer rate** on `unanswerable` questions (no expected source or section, left out of retrieval): an answer instead of "I don't know" is a confident answer to something the runbooks don't cover, the main safety number;
   - **answer rate** and **citation accuracy** (a citation of the expected source and section) on answerable questions;
   - **key facts**: every `must_contain` string in the answer, case-insensitive.
@@ -74,9 +75,15 @@ Lightweight ADRs. One entry per decision: what, why, what it costs.
 
 ### scope/5 — Eval pass thresholds
 
-**Status:** Open · **Priority:** P2
+**Status:** Proposed · **Priority:** P2
 
 - Target numbers for recall@5, MRR (with vs without reranker, scope/3), and ticket precision/recall.
+- **Recommendation (2026-11-02, in `tests/eval/test_thresholds.py`, run with `pytest -m eval`):** a little below the first measured numbers,
+  so a real regression fails and the LLM's run-to-run spread doesn't. Prefilter recall 1.0 over 5 seeds (deterministic, no LLM: a lost
+  fault is a regression); retrieval recall@10 ≥ 0.95 and MRR ≥ 0.80 on the 71 non-held-out questions (measured 1.0 and 0.85); triage
+  on seeds 1-2, 2 h each, recall ≥ 0.6 and precision ≥ 0.9 (measured 0.714-0.857 and 1.0 over two configs).
+- **Why:** 14 faults and 71 questions are small: one item moves recall by 7 and 1.4 points, so thresholds sit a few items below the
+  measurement, and raise as the sets grow (more seeds).
 
 ### scope/6 — LLM-as-judge for answer quality
 
